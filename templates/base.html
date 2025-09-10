@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Fitness App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+  <style>
+    body { font-family: 'Roboto', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <nav class="bg-black text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <a href="{{ url_for('home') }}" class="text-2xl font-bold text-red-600">AI Fitness</a>
+      <div class="space-x-4">
+        <a href="{{ url_for('home') }}" class="hover:text-red-500">Home</a>
+        <a href="{{ url_for('add_user') }}" class="hover:text-red-500">Add User</a>
+        {% if user %}
+        <a href="{{ url_for('dashboard', user_id=user.id) }}" class="hover:text-red-500">Dashboard</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-5xl mx-auto p-6">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-4">
+          {% for category, msg in messages %}
+            <div class="px-4 py-2 rounded {{ 'bg-red-600 text-white' if category=='error' else 'bg-green-600 text-white' }}">
+              {{ msg }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

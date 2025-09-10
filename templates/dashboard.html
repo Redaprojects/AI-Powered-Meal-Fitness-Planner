@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto mt-10">
+  <h2 class="text-3xl font-bold text-red-600 mb-6">Dashboard - {{ user.user_name }}</h2>
+
+  <!-- Buttons -->
+  <div class="mb-6 space-x-4">
+    <a href="{{ url_for('generate_plan', user_id=user.id) }}"
+       class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
+       Generate Daily Workout & Meal Plan
+    </a>
+    <a href="{{ url_for('generate_weekly_plan_route', user_id=user.id) }}"
+       class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
+       Generate Weekly Workout & Meal Plan
+    </a>
+  </div>
+
+  <div class="mb-6">
+    <h3 class="font-bold">P = Proteins, C = Carbs, F = Fats</h3>
+  </div>
+
+  <!-- Daily Plans Section -->
+  <h2 class="text-2xl font-bold text-black mb-4">Daily Plans</h2>
+  {% if user.daily_plans %}
+    {% for plan in user.daily_plans %}
+      <div class="bg-white shadow rounded-lg p-6 mb-6 border-l-4 border-red-600">
+        <h3 class="text-xl font-semibold text-black mb-3">
+          Plan Date: {{ plan.created_at.strftime('%Y-%m-%d') }}
+        </h3>
+
+        <h4 class="font-bold text-red-600 mt-2">Meals</h4>
+        <ul class="list-disc ml-6 font-bold">
+          {% for meal in plan.data.get("meals", []) %}
+            <li>{{ meal.name }}: {{ meal.calories }} kcal |
+            P: {{ meal.protein }}g | C: {{ meal.carbs }}g | F: {{ meal.fat }}g</li>
+          {% endfor %}
+        </ul>
+
+        <h4 class="font-bold text-red-600 mt-2">Workouts</h4>
+        <ul class="list-disc ml-6">
+          {% for workout in plan.data.get("workouts", []) %}
+            <li>
+              {{ workout.name }} ({{ workout.type }}) – {{ workout.duration }},
+              Intensity: {{ workout.intensity }}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-gray-700">No daily plan generated yet.</p>
+  {% endif %}
+
+  <!-- Weekly Plans Section -->
+  <h2 class="text-2xl font-bold text-black mb-4">Weekly Plans</h2>
+  {% if user.weekly_plans %}
+    {% for plan in user.weekly_plans %}
+      <div class="bg-white shadow rounded-lg p-6 mb-6 border-l-4 border-green-600">
+        <h3 class="text-xl font-semibold text-black mb-3">
+          Weekly Plan (Created: {{ plan.created_at.strftime('%Y-%m-%d') }})
+        </h3>
+
+        {% for day, details in plan.data.items() %}
+          <div class="mb-4">
+            <h4 class="text-lg font-bold text-red-600">{{ day }}</h4>
+
+            {% if details.rest_day %}
+              <p class="text-gray-700 font-bold">Rest Day 🛌</p>
+              <p class="italic">{{ details.notes }}</p>
+            {% else %}
+              <h5 class="font-bold mt-2">Meals</h5>
+              <ul class="list-disc ml-6 font-bold">
+                {% for meal in details.meals %}
+                  <li>{{ meal.name }}: {{ meal.calories }} kcal |
+                  P: {{ meal.protein }}g | C: {{ meal.carbs }}g | F: {{ meal.fat }}g</li>
+                {% endfor %}
+              </ul>
+
+              <h5 class="font-bold mt-2">Workouts</h5>
+              <ul class="list-disc ml-6">
+                {% for workout in details.workouts %}
+                  <li>
+                    {{ workout.name }} ({{ workout.type }}) – {{ workout.duration }},
+                    Sets: {{ workout.sets }}, Reps: {{ workout.reps }},
+                    Rest: {{ workout.rest_between_sets }},
+                    Intensity: {{ workout.intensity }}
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-gray-700">No weekly plan generated yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+<h2 class="text-2xl font-bold text-red-600 mb-4">Today's AI-Generated Plan</h2>
+
+<h3 class="font-bold text-black mt-2">Meals</h3>
+<ul>
+  {% for meal in plan['meals'] %}
+    <li>{{ meal.name }} - {{ meal.calories }} kcal | P: {{ meal.protein }}g | C: {{ meal.carbs }}g | F: {{ meal.fat }}g</li>
+  {% endfor %}
+</ul>
+
+<h3 class="font-bold text-black mt-2">Workouts</h3>
+<ul>
+  {% for workout in plan['workouts'] %}
+    <li>{{ workout.name }} - {{ workout.type }}, Duration: {{ workout.duration }} min, Intensity: {{ workout.intensity }}</li>
+  {% endfor %}
+</ul>
