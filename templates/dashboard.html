@@ -8,12 +8,27 @@
     <a href="{{ url_for('generate_plan', user_id=user.id) }}"
        class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
        Generate Daily Workout & Meal Plan
+
     </a>
     <a href="{{ url_for('generate_weekly_plan_route', user_id=user.id) }}"
-       class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
+       class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold" >
        Generate Weekly Workout & Meal Plan
     </a>
   </div>
+
+          <form action="{{ url_for('generate_weekly_plan_route', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
+  <button type="submit"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg">
+    Generate Weekly Plan
+  </button>
+</form>
+
+            <form action="{{ url_for('generate_plan', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
+  <button type="submit"
+          class="bg-red-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg">
+    Generate daily Plan
+  </button>
+</form>
 
   <div class="mb-6">
     <h3 class="font-bold">P = Proteins, C = Carbs, F = Fats</h3>
@@ -25,7 +40,13 @@
     {% for plan in user.daily_plans %}
       <div class="bg-white shadow rounded-lg p-6 mb-6 border-l-4 border-red-600">
         <h3 class="text-xl font-semibold text-black mb-3">
-          Plan Date: {{ plan.created_at.strftime('%Y-%m-%d') }}
+          Daily Plan Generated on:
+  {% if plan.created_at %}
+    {{ plan.created_at.strftime("%Y-%m-%d") }},
+    at {{ plan.created_at.strftime("%H:%M") }}
+  {% else %}
+    N/A
+  {% endif %}
         </h3>
 
         <h4 class="font-bold text-red-600 mt-2">Meals</h4>
@@ -41,7 +62,7 @@
           {% for workout in plan.data.get("workouts", []) %}
             <li>
               {{ workout.name }} ({{ workout.type }}) – {{ workout.duration }},
-              Intensity: {{ workout.intensity }}
+              Intensity: {{ workout.intensity }}, Instructions: {{ workout.Instructions }}
             </li>
           {% endfor %}
         </ul>
@@ -57,8 +78,16 @@
     {% for plan in user.weekly_plans %}
       <div class="bg-white shadow rounded-lg p-6 mb-6 border-l-4 border-green-600">
         <h3 class="text-xl font-semibold text-black mb-3">
-          Weekly Plan (Created: {{ plan.created_at.strftime('%Y-%m-%d') }})
+          Weekly Plan Generated on:
+  {% if plan.created_at %}
+    {{ plan.created_at.strftime("%Y-%m-%d") }},
+    at {{ plan.created_at.strftime("%H:%M") }}
+  {% else %}
+    N/A
+  {% endif %}
         </h3>
+
+
 
         {% for day, details in plan.data.items() %}
           <div class="mb-4">
@@ -71,8 +100,11 @@
               <h5 class="font-bold mt-2">Meals</h5>
               <ul class="list-disc ml-6 font-bold">
                 {% for meal in details.meals %}
-                  <li>{{ meal.name }}: {{ meal.calories }} kcal |
-                  P: {{ meal.protein }}g | C: {{ meal.carbs }}g | F: {{ meal.fat }}g</li>
+                  <li>
+                    {% if not 'Snack' in meal.name %}Meal : {% endif %}
+                    {{ meal.name }}: {{ meal.description }}: {{ meal.calories }} kcal |
+                    P: {{ meal.protein }}g | C: {{ meal.carbs }}g | F: {{ meal.fat }}g
+                  </li>
                 {% endfor %}
               </ul>
 
@@ -81,6 +113,7 @@
                 {% for workout in details.workouts %}
                   <li>
                     {{ workout.name }} ({{ workout.type }}) – {{ workout.duration }},
+                    Instructions: {{ workout.Instructions }},
                     Sets: {{ workout.sets }}, Reps: {{ workout.reps }},
                     Rest: {{ workout.rest_between_sets }},
                     Intensity: {{ workout.intensity }}

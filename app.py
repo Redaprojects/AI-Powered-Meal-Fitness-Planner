@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, flash, redirect, url_for
-from datamanager.models import db, User, Workout, WorkoutPlan, Meal, Log, DailyPlan, WeeklyPlan
+from datamanager.models import db, User, DailyPlan, WeeklyPlan
 from datamanager.sqlite_data_manager import SQLiteDataManager
 from validation import validate_user_data
-from datetime import datetime, date
+from datetime import datetime,timezone ,date
 import json
 from ai.openai_service import generate_daily_plan, generate_weekly_plan
 from flask_migrate import Migrate
+import requests
+from functools import lru_cache
 
 
 app = Flask(__name__)
@@ -91,8 +93,19 @@ def add_user():
 @app.context_processor
 def time_now():
     return {
-        "now": datetime.utcnow(),
+        "now": datetime.now(timezone.utc),
         "today": date.today()
+    }
+
+
+@app.context_processor
+def inject_date_info():
+    """This function injects global date info into all templates."""
+    today = datetime.today()
+    return {
+        "month_name": today.strftime("%B"),  # e.g., "October"
+        "weekday_name": today.strftime("%A"),  # e.g., "Tuesday"
+        "today": today
     }
 
 
@@ -125,8 +138,12 @@ def dashboard(user_id):
     # Parse JSON strings into Python dicts for daily plans
     for plan in user.daily_plans:
         try:
-            plan.data = json.loads(plan.plan_json)
-        except Exception:
+            if isinstance(plan.plan_json, str):
+                plan.data = json.loads(plan.plan_json)
+            else:
+                plan.data = plan.plan_json
+        except Exception as e:
+            print("Error parsing daily plan:", e)
             plan.data = {} # fallback if broken JSON
 
     # Parse JSON for weekly plans
@@ -134,10 +151,37 @@ def dashboard(user_id):
         if isinstance(plan.plan_json, str):
             try:
                 plan.data = json.loads(plan.plan_json)
-            except Exception:
+            except Exception as e:
+                print("Error parsing weekly plan:", e)
                 plan.data = {}
 
+
+            finally:
+                db.session.close()
+
     return render_template("dashboard.html", user=user)
+
+
+# --- 🌐 Meal Image Fetcher with Caching ---
+@lru_cache(maxsize=200)
+def get_meal_image(meal_name: str) -> str:
+    """
+    Fetches a meal image from TheMealDB API by meal name.
+    Uses an in-memory cache to reduce repeated API calls.
+    """
+    try:
+        response = requests.get(
+            f"https://www.themealdb.com/api/json/v1/1/search.php?s={meal_name}"
+        )
+        data = response.json()
+        meals = data.get("meals")
+        if meals and meals[0].get("strMealThumb"):
+            return meals[0]["strMealThumb"]
+    except Exception as e:
+        print(f"Error fetching image for {meal_name}: {e}")
+
+    # fallback placeholder if not found
+    return url_for("static", filename="default_meal.jpg")
 
 
 @app.route('/generate_plan/<int:user_id>')
@@ -148,18 +192,28 @@ def generate_plan(user_id):
         return redirect(url_for("home"))
 
     try:
+        db.session.commit()  # commit any pending changes
+
+        # Call your AI service for daily plan
         plan_data = generate_daily_plan(user)
+
+        # ✅ Attach meal images
+        for meal in plan_data.get("meals", []):
+            meal_name = meal.get("name")
+            if meal_name:
+                meal["image_url"] = get_meal_image(meal_name)
 
         # Save to DB
         daily_plan = DailyPlan(
             user_id=user.id,
-            plan_json=json.dumps(plan_data)
+            plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
         )
         db.session.add(daily_plan)
         db.session.commit()
 
         flash("Daily plan generated successfully!", "success")
     except Exception as e:
+        db.session.rollback()
         flash(f"Error generating plan: {str(e)}", "error")
 
     return redirect(url_for('dashboard', user_id=user.id))
@@ -173,18 +227,28 @@ def generate_weekly_plan_route(user_id):
         return redirect(url_for("home"))
 
     try:
+        db.session.commit()  # commit any pending changes
+
         # Call your AI service for weekly plan
         plan_data = generate_weekly_plan(user)
 
+        # ✅ Add images for each meal in each day
+        for day in plan_data.get("days", []):
+            for meal in day.get("meals", []):
+                meal_name = meal.get("name")
+                if meal_name:
+                    meal["image_url"] = get_meal_image(meal_name)
+
         weekly_plan = WeeklyPlan(
             user_id=user.id,
-            plan_json=json.dumps(plan_data)
+            plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
         )
         db.session.add(weekly_plan)
         db.session.commit()
 
         flash("Weekly plan generated successfully!", "success")
     except Exception as e:
+        db.session.rollback()
         flash(f"Error generating weekly plan: {str(e)}", "error")
 
     return redirect(url_for('dashboard', user_id=user.id))

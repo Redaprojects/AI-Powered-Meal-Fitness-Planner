@@ -7,9 +7,22 @@
   {% endfor %}
 </ul>
 
+<!--preview the meal pic to the user-->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+  {% for meal in plan.get("meals", []) %}
+  <div class="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition">
+    <img src="{{ meal.image_url }}" alt="{{ meal.name }}" class="w-full h-48 object-cover">
+    <div class="p-4">
+      <h2 class="text-lg font-bold text-gray-800">{{ meal.name }}</h2>
+      <p class="text-gray-600 text-sm mt-1">{{ meal.description or 'No details provided.' }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
 <h3 class="font-bold text-black mt-2">Workouts</h3>
 <ul>
   {% for workout in plan['workouts'] %}
-    <li>{{ workout.name }} - {{ workout.type }}, Duration: {{ workout.duration }} min, Intensity: {{ workout.intensity }}</li>
+    <li>{{ workout.name }} - {{ workout.type }}, Duration: {{ workout.duration }} min, Intensity: {{ workout.intensity }}, Instructions: {{ workout.Instructions }}</li>
   {% endfor %}
 </ul>
