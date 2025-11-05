@@ -8,6 +8,7 @@ from ai.openai_service import generate_daily_plan, generate_weekly_plan
 from flask_migrate import Migrate
 import requests
 from functools import lru_cache
+from ai.openai_img import generate_meal_image
 
 
 app = Flask(__name__)
@@ -130,21 +131,42 @@ def daily_plan(user_id):
 
 @app.route('/dashboard/<int:user_id>')
 def dashboard(user_id):
-    user = User.query.get(user_id)
+    # old
+    # user = User.query.get(user_id)
+    # new
+    user = db.session.get(User, user_id)
     if not user:
         flash("User not found")
         return redirect(url_for('home'))
 
     # Parse JSON strings into Python dicts for daily plans
     for plan in user.daily_plans:
+    #     try:
+    #         if isinstance(plan.plan_json, str):
+    #             plan.data = json.loads(plan.plan_json)
+    #         else:
+    #             plan.data = plan.plan_json
+    #     except Exception as e:
+    #         print("Error parsing daily plan:", e)
+    #         plan.data = {} # fallback if broken JSON
+
         try:
-            if isinstance(plan.plan_json, str):
-                plan.data = json.loads(plan.plan_json)
-            else:
-                plan.data = plan.plan_json
+            data = plan.plan_json
+            if isinstance(data, str):
+                data = json.loads(data)
+
+            # attach missing pictures
+            for meal in data.get("meals", []):
+                if "image_url" not in meal or not meal["image_url"]:
+                    name = meal.get("name")
+                    if name:
+                        meal["image_url"] = get_meal_image(name)
+            print(vars(plan), "test")
+            plan.data = data   # plan = data
+            print(vars(plan))
         except Exception as e:
-            print("Error parsing daily plan:", e)
-            plan.data = {} # fallback if broken JSON
+            print("[Dashboard parse error]", e)
+            plan.data = {}
 
     # Parse JSON for weekly plans
     for plan in user.weekly_plans:
@@ -170,18 +192,88 @@ def get_meal_image(meal_name: str) -> str:
     Uses an in-memory cache to reduce repeated API calls.
     """
     try:
+    #     meal_name = meal_name.strip().title
+    #     response = requests.get(
+    #         f"https://www.themealdb.com/api/json/v1/1/search.php?s={meal_name}"
+    #     )
+    #     data = response.json()
+    #     meals = data.get("meals")
+    #     if meals and meals[0].get("strMealThumb"):
+    #         return meals[0]["strMealThumb"]
+    # except Exception as e:
+    #     print(f"Error fetching image for {meal_name}: {e}")
+    #
+    # # fallback placeholder if not found
+    # return url_for("static", filename="default_meal.jpg")
+
+        clean = meal_name.strip().title()  # normalize casing
         response = requests.get(
-            f"https://www.themealdb.com/api/json/v1/1/search.php?s={meal_name}"
+            f"https://www.themealdb.com/api/json/v1/1/search.php?s={clean}",
+            timeout=5,
         )
         data = response.json()
         meals = data.get("meals")
         if meals and meals[0].get("strMealThumb"):
             return meals[0]["strMealThumb"]
-    except Exception as e:
-        print(f"Error fetching image for {meal_name}: {e}")
 
-    # fallback placeholder if not found
-    return url_for("static", filename="default_meal.jpg")
+        # --- fallback: retry using only the first keyword (e.g. 'Chicken' from 'Chicken Salad Bowl')
+        first_word = clean.split()[0]
+        response = requests.get(
+            f"https://www.themealdb.com/api/json/v1/1/search.php?s={first_word}",
+            timeout=5,
+        )
+        data = response.json()
+        meals = data.get("meals")
+        if meals and meals[0].get("strMealThumb"):
+            return meals[0]["strMealThumb"]
+
+        # else generate a meal pic:
+        else:
+            generated_image_path = generate_meal_image(meal_name)
+            return generated_image_path
+
+
+    except Exception as e:
+        print(f"[Meal image fetch error] {meal_name!r}: {e}")
+        return generate_meal_image(meal_name)
+    # still nothing → static placeholder
+
+
+    # return url_for("static", filename="default_meal.jpg")
+
+# @app.route('/generate_plan/<int:user_id>')
+# def generate_plan(user_id):
+#     user = User.query.get(user_id)
+#     if not user:
+#         flash("User not found", "error")
+#         return redirect(url_for("home"))
+#
+#     try:
+#         db.session.commit()  # commit any pending changes
+#
+#         # Call your AI service for daily plan
+#         plan_data = generate_daily_plan(user)
+#
+#         # ✅ Attach meal images
+#         for meal in plan_data.get("meals", []):
+#             meal_name = meal.get("name")
+#             if meal_name:
+#                 meal["image_url"] = get_meal_image(meal_name)
+#
+#         # Save to DB
+#         daily_plan = DailyPlan(
+#             user_id=user.id,
+#             plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
+#         )
+#         db.session.add(daily_plan)
+#         db.session.commit()
+#
+#         flash("Daily plan generated successfully!", "success")
+#     except Exception as e:
+#         db.session.rollback()
+#         flash(f"Error generating plan: {str(e)}", "error")
+#
+#     return redirect(url_for('dashboard', user_id=user.id))
 
 
 @app.route('/generate_plan/<int:user_id>')
@@ -192,13 +284,13 @@ def generate_plan(user_id):
         return redirect(url_for("home"))
 
     try:
-        db.session.commit()  # commit any pending changes
+        db.session.commit()
 
-        # Call your AI service for daily plan
-        plan_data = generate_daily_plan(user)
+        plan_data = generate_daily_plan(user)  # returns DailyPlan (Pydantic model)
+        plan_dict = plan_data.model_dump()            # ← convert to Python dict
 
-        # ✅ Attach meal images
-        for meal in plan_data.get("meals", []):
+        # --- ✨ attach meal images here ---
+        for meal in plan_dict.get("meals", []):
             meal_name = meal.get("name")
             if meal_name:
                 meal["image_url"] = get_meal_image(meal_name)
@@ -206,12 +298,13 @@ def generate_plan(user_id):
         # Save to DB
         daily_plan = DailyPlan(
             user_id=user.id,
-            plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
+            plan_json=json.dumps(plan_dict, indent=2)
         )
         db.session.add(daily_plan)
         db.session.commit()
 
         flash("Daily plan generated successfully!", "success")
+
     except Exception as e:
         db.session.rollback()
         flash(f"Error generating plan: {str(e)}", "error")

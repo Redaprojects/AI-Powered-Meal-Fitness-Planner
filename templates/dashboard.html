@@ -4,31 +4,21 @@
   <h2 class="text-3xl font-bold text-red-600 mb-6">Dashboard - {{ user.user_name }}</h2>
 
   <!-- Buttons -->
-  <div class="mb-6 space-x-4">
-    <a href="{{ url_for('generate_plan', user_id=user.id) }}"
+  <div class="flex items-center mb-6 space-x-4">
+    <form action="{{ url_for('generate_plan', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
+      <button type="submit"
        class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
        Generate Daily Workout & Meal Plan
+        </button>
+    </form>
 
-    </a>
-    <a href="{{ url_for('generate_weekly_plan_route', user_id=user.id) }}"
+    <form action="{{ url_for('generate_weekly_plan_route', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
+      <button type="submit"
        class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold" >
        Generate Weekly Workout & Meal Plan
-    </a>
+      </button>
+    </form>
   </div>
-
-          <form action="{{ url_for('generate_weekly_plan_route', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
-  <button type="submit"
-          class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg">
-    Generate Weekly Plan
-  </button>
-</form>
-
-            <form action="{{ url_for('generate_plan', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
-  <button type="submit"
-          class="bg-red-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg">
-    Generate daily Plan
-  </button>
-</form>
 
   <div class="mb-6">
     <h3 class="font-bold">P = Proteins, C = Carbs, F = Fats</h3>
@@ -52,10 +42,20 @@
         <h4 class="font-bold text-red-600 mt-2">Meals</h4>
         <ul class="list-disc ml-6 font-bold">
           {% for meal in plan.data.get("meals", []) %}
+
+            <!--meal pic-->
+            <div class="flex items-center space-x-4">
+            <img src="{{ meal.image_url or url_for('static', filename='default_meal.jpg') }}"
+            alt="{{ meal.name }}"
+            class="w-24 h-24 object-cover rounded border border-gray-200">
+            <div>
+
             <li>{{ meal.name }}: {{ meal.calories }} kcal |
             P: {{ meal.protein }}g | C: {{ meal.carbs }}g | F: {{ meal.fat }}g</li>
           {% endfor %}
         </ul>
+
+
 
         <h4 class="font-bold text-red-600 mt-2">Workouts</h4>
         <ul class="list-disc ml-6">
