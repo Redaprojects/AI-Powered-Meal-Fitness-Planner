@@ -16,14 +16,16 @@ class User(db.Model):
     activity_level = db.Column(db.String(20), nullable=True)
     dietary_pref = db.Column(db.String, nullable=False)
     fitness_goal = db.Column(db.String, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     workout = db.relationship('Workout', backref='user', cascade="all, delete", lazy=True )
     workout_plan = db.relationship('WorkoutPlan', backref='user', cascade="all, delete", lazy=True)
     meal = db.relationship('Meal', backref='user', cascade="all, delete", lazy=True)
     log = db.relationship('Log', backref='user', cascade="all, delete", lazy=True)
-    daily_plans = db.relationship('DailyPlan', back_populates='user', cascade="all, delete", lazy=True)
-    weekly_plans = db.relationship("WeeklyPlan", back_populates="user", cascade="all, delete-orphan")
+    daily_plans = db.relationship('DailyPlan', back_populates='user', cascade="all, delete", lazy=True,
+                                  order_by="desc(DailyPlan.created_at)") # newest first
+    weekly_plans = db.relationship("WeeklyPlan", back_populates="user", cascade="all, delete-orphan",
+                                  order_by="desc(WeeklyPlan.created_at)") # newest first
 
 
 class Workout(db.Model):
@@ -36,7 +38,7 @@ class Workout(db.Model):
     duration = db.Column(db.Integer)
     intensity = db.Column(db.String)
     description = db.Column(db.String)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     workout_plan_id = db.Column(db.Integer, db.ForeignKey('workout_plans.id'), nullable=False)
@@ -49,7 +51,7 @@ class WorkoutPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(50), unique=True, nullable=False)
     active = db.Column(db.Boolean)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     workouts = db.relationship('Workout', backref='plan', cascade="all, delete", lazy=True)
@@ -63,7 +65,7 @@ class DailyPlan(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     date = db.Column(db.Date, default=lambda: datetime.utcnow().date())
     plan_json = db.Column(db.Text, nullable=False)  # Save JSON as string
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship('User', back_populates='daily_plans')
 
@@ -83,7 +85,7 @@ class WeeklyPlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     plan_json = db.Column(db.JSON)  # Full Monday–Sunday JSON
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship("User", back_populates="weekly_plans")
 
@@ -100,7 +102,8 @@ class Meal(db.Model):
     fat =  db.Column(db.Float)
     ingredients = db.Column(db.String)
     instructions = db.Column(db.String)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    Rest_time= db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
@@ -126,6 +129,6 @@ class Log(db.Model):
     workouts_completed = db.Column(db.Integer)
     mood = db.Column(db.String)
     notes = db.Column(db.String)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
