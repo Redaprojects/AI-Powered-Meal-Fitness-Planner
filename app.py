@@ -4,11 +4,15 @@ from datamanager.sqlite_data_manager import SQLiteDataManager
 from validation import validate_user_data
 from datetime import datetime,timezone ,date
 import json
-from ai.openai_service import generate_daily_plan, generate_weekly_plan
+from ai.openai_service import generate_daily_plan, generate_weekly_plan, generate_daily_meals, generate_daily_workouts
 from flask_migrate import Migrate
 import requests
 from functools import lru_cache
-from ai.openai_img import generate_meal_image
+from ai.openai_img import generate_meal_image, generate_workout_image
+# Use threading (optional for dev)
+# If you still want to fill missing images on the fly but not freeze the page, use a background thread or task queue.
+# For a quick Flask-only approach:
+import threading
 
 
 app = Flask(__name__)
@@ -135,12 +139,14 @@ def dashboard(user_id):
     # user = User.query.get(user_id)
     # new
     user = db.session.get(User, user_id)
+    print(user, "UUUUUUUUUUU")
     if not user:
         flash("User not found")
         return redirect(url_for('home'))
 
     # Parse JSON strings into Python dicts for daily plans
     for plan in user.daily_plans:
+        raw = plan.plan_json
     #     try:
     #         if isinstance(plan.plan_json, str):
     #             plan.data = json.loads(plan.plan_json)
@@ -152,34 +158,52 @@ def dashboard(user_id):
 
         try:
             data = plan.plan_json
-            if isinstance(data, str):
-                data = json.loads(data)
-
-            # attach missing pictures
-            for meal in data.get("meals", []):
-                if "image_url" not in meal or not meal["image_url"]:
-                    name = meal.get("name")
-                    if name:
-                        meal["image_url"] = get_meal_image(name)
-            print(vars(plan), "test")
-            plan.data = data   # plan = data
-            print(vars(plan))
+            #
+            # # 🛡️ Skip parsing when empty or None
+            # if not data:
+            #     plan.data = {"meals": [], "workouts": []}
+            #     continue
+            #
+            # 1️⃣ Parse JSON strings until we actually get a dict
+            if isinstance(raw, str):
+                data = json.loads(raw)
+            else:
+                data = raw
+            #     # Sometimes data is a stringified dict nested once more
+            #     while isinstance(data, str):
+            #         data = json.loads(data)
+            #
+            # 2️⃣ Guarantee fallback
+            if not isinstance(data, dict):
+                 raise ValueError("Data is not a dictionary after parsing")
+            #
+            # # 3️⃣ Attach missing pictures
+            # for meal in data.get("meals", []):
+            #     if isinstance(meal, dict):
+            #         name = meal.get("name")
+            #         if name and not meal.get("image_url"):
+            #             meal["image_url"] = get_meal_image(name)
+            # print(vars(plan), "test")    # plan before transforming and to print the result on the dashboard
+            plan.data = data
+            # {"meals": [], "workouts": []}  # plan = data
+            # print(vars(plan))            # plan after transforming to print the result on the dashboard
         except Exception as e:
             print("[Dashboard parse error]", e)
-            plan.data = {}
+            # plan.data = {}
+            plan.data = {"meals": [], "workouts": []}
 
     # Parse JSON for weekly plans
     for plan in user.weekly_plans:
-        if isinstance(plan.plan_json, str):
-            try:
-                plan.data = json.loads(plan.plan_json)
-            except Exception as e:
+        raw = plan.plan_json
+        try:
+
+            if isinstance(raw, str):
+                plan.data = json.loads(raw)
+            else:
+                plan.data = raw or {}
+        except Exception as e:
                 print("Error parsing weekly plan:", e)
                 plan.data = {}
-
-
-            finally:
-                db.session.close()
 
     return render_template("dashboard.html", user=user)
 
@@ -217,15 +241,15 @@ def get_meal_image(meal_name: str) -> str:
             return meals[0]["strMealThumb"]
 
         # --- fallback: retry using only the first keyword (e.g. 'Chicken' from 'Chicken Salad Bowl')
-        first_word = clean.split()[0]
-        response = requests.get(
-            f"https://www.themealdb.com/api/json/v1/1/search.php?s={first_word}",
-            timeout=5,
-        )
-        data = response.json()
-        meals = data.get("meals")
-        if meals and meals[0].get("strMealThumb"):
-            return meals[0]["strMealThumb"]
+        # first_word = clean.split()[0]
+        # response = requests.get(
+        #     f"https://www.themealdb.com/api/json/v1/1/search.php?s={first_word}",
+        #     timeout=5,
+        # )
+        # data = response.json()
+        # meals = data.get("meals")
+        # if meals and meals[0].get("strMealThumb"):
+        #     return meals[0]["strMealThumb"]
 
         # else generate a meal pic:
         else:
@@ -237,7 +261,6 @@ def get_meal_image(meal_name: str) -> str:
         print(f"[Meal image fetch error] {meal_name!r}: {e}")
         return generate_meal_image(meal_name)
     # still nothing → static placeholder
-
 
     # return url_for("static", filename="default_meal.jpg")
 
@@ -276,9 +299,23 @@ def get_meal_image(meal_name: str) -> str:
 #     return redirect(url_for('dashboard', user_id=user.id))
 
 
+# --- 🌐 Meal Image Fetcher with Caching ---
+@lru_cache(maxsize=200)
+def get_workout_image(workout_name: str) -> str:
+    try:
+        generated_image_path = generate_workout_image(workout_name)
+        return generated_image_path
+
+    except Exception as e:
+        print(f"[Workout image fetch error] {workout_name!r}: {e}")
+        return generate_workout_image(workout_name)
+
+
+
 @app.route('/generate_plan/<int:user_id>')
 def generate_plan(user_id):
-    user = User.query.get(user_id)
+    # user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         flash("User not found", "error")
         return redirect(url_for("home"))
@@ -314,7 +351,8 @@ def generate_plan(user_id):
 
 @app.route('/generate_weekly_plan/<int:user_id>')
 def generate_weekly_plan_route(user_id):
-    user = User.query.get(user_id)
+    # user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         flash("User not found", "error")
         return redirect(url_for("home"))
@@ -347,5 +385,120 @@ def generate_weekly_plan_route(user_id):
     return redirect(url_for('dashboard', user_id=user.id))
 
 
+# Fill missing images on the fly, but do not freeze the page; use a background thread or task queue.
+def async_get_meal_image(meal, workout):
+    if meal:
+        meal_name = meal.get("name")
+        meal["image_url"] = get_meal_image(meal_name)
+
+    else:
+    
+        workout_name = workout.get("name")
+        workout["image_url"] = get_workout_image(workout_name)
+
+    # in dashboard parsing loop
+    threading.Thread(target=async_get_meal_image, args=(meal, workout)).start()
+
+
+
+# --- Generate only daily meals ---
+@app.route("/generate_daily_meals/<int:user_id>")
+def generate_daily_meals(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for('home'))
+    try:
+        # 🔹 Call AI but only request meals
+        from ai.openai_service import generate_daily_meals
+        plan_data = generate_daily_meals(user)
+        plan_dict = plan_data.model_dump()
+
+        for meal in plan_dict.get("meals", []):
+            meal_name = meal.get("name")
+            if meal_name:
+                meal["image_url"] = get_meal_image(meal_name)
+
+        # ✅ save to DB as a partial plan (just meals)
+        daily_plan = DailyPlan(user_id=user.id, plan_json=json.dumps(plan_dict))
+        db.session.add(daily_plan)
+        db.session.commit()
+        flash("Daily meals generated successfully!", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error generating meals: {str(e)}", "error")
+
+    return redirect(url_for('dashboard', user_id=user.id))
+
+# --- Generate only daily workouts ---
+@app.route("/generate_daily_workouts/<int:user_id>")
+def generate_daily_workouts(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for('home'))
+
+    try:
+        from ai.openai_service import generate_daily_workouts
+        plan_data = generate_daily_workouts(user)
+        plan_dict = plan_data.model_dump()
+
+        for workout in plan_dict.get("workouts", []):
+            workout_name = workout.get("name")
+            if workout_name:
+                workout["image_url"] = get_workout_image(workout_name)
+
+        daily_plan = DailyPlan(user_id=user.id, plan_json=json.dumps(plan_dict))
+        db.session.add(daily_plan)
+        db.session.commit()
+        flash("Daily workouts generated successfully!", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error generating workouts: {str(e)}", "error")
+
+    return redirect(url_for('dashboard', user_id=user.id))
+
+
+@app.route("/daily_meals/<int:user_id>")
+def daily_meals(user_id):
+    user = db.session.get(User, user_id)
+    plans = DailyPlan.query.filter_by(user_id=user_id).all()
+    parsed = [json.loads(p.plan_json) | {"id": p.id} for p in plans]
+    return render_template("daily_meals.html", user=user, plans=parsed)
+
+@app.route("/daily_workouts/<int:user_id>")
+def daily_workouts(user_id):
+    # user = db.session.get(User, user_id)
+    plans = DailyPlan.query.filter_by(user_id=user_id).all()
+    parsed = [json.loads(p.plan_json) | {"id": p.id} for p in plans]
+    return render_template("daily_workouts.html", user=user, plans=parsed)
+
+@app.route("/item/<string:item_type>/<int:plan_id>/<int:item_index>")
+def item_details(item_type, plan_id, item_index):
+    plan = db.session.get(DailyPlan, plan_id)
+    if not plan:
+        flash("Plan not found", "error")
+        return redirect(url_for("home"))
+
+    data = json.loads(plan.plan_json)
+    item = None
+    if item_type == "meal":
+        item = data.get("meals index", [])[item_index]
+        print("test (meal)"[item_index])
+    elif item_type == "workout":
+        item = data.get("workouts", [])[item_index]
+        print("test (workout index)"[item_index])
+    else:
+        flash("Invalid item type", "error")
+        return redirect(url_for("dashboard", user_id=plan.user_id))
+
+    return render_template("item_details.html",
+                           item=item,
+                           item_type=item_type,
+                           user_id=plan.user_id)
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001) # uvicorn to run the server

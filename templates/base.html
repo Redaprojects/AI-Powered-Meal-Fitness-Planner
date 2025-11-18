@@ -11,18 +11,30 @@
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
+
   <nav class="bg-black text-white shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-      <a href="{{ url_for('home') }}" class="text-2xl font-bold text-red-600">AI Fitness APP</a>
-      <div class="space-x-4">
-        <a href="{{ url_for('home') }}" class="hover:text-red-500">Home</a>
-        <a href="{{ url_for('add_user') }}" class="hover:text-red-500">Add User</a>
-        {% if user %}
-        <a href="{{ url_for('dashboard', user_id=user.id) }}" class="hover:text-red-500">Dashboard</a>
-        {% endif %}
-      </div>
+    <div class="max-w-8xl mx-auto px-0 py-0 flex justify-between items-center">
+
+      <!-- 🔹 Logo + Title -->
+    <div class="flex items-center space-x-3">
+      <img src="{{ url_for('static', filename='logo/b_but_the_wall_is_in_t.png') }}"
+           alt="Fitness Lab Logo"
+           class="h-20 w-auto object-contain"> <!-- fixed height -->
+      <a href="{{ url_for('home') }}" class="text-2xl font-bold text-red-600">
+        FIT AI
+      </a>
     </div>
-  </nav>
+
+    <!-- 🔹 Nav links -->
+    <div class="space-x-4 text-sm md:text-base">
+      <a href="{{ url_for('home') }}" class="hover:text-red-500">Home</a>
+      <a href="{{ url_for('add_user') }}" class="hover:text-red-500">Add User</a>
+      {% if user %}
+      <a href="{{ url_for('dashboard', user_id=user.id) }}" class="hover:text-red-500">Dashboard</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
 
 
   <main class="max-w-5xl mx-auto p-6">

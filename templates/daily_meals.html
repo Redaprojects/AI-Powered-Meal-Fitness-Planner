@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-2xl font-bold text-red-600 mb-6">🍽️ Your Daily Meals</h2>
+
+<div class="grid grid-flow-col auto-cols-max gap-6 overflow-x-auto">
+  {% for plan in plans %}
+    {% for meal in plan.meals %}
+      <a href="{{ url_for('item_details',
+                          item_type='meal',
+                          plan_id=plan.id,
+                          item_index=loop.index0) }}"
+         class="flex flex-col bg-white rounded-lg shadow w-60">
+        <img src="{{ meal.image_url or url_for('static', filename='default_meal.jpg') }}"
+             alt="{{ meal.name }}"
+             class="w-full h-40 object-cover rounded-t">
+        <div class="p-3 text-center">
+          <h3 class="font-semibold text-gray-800">{{ meal.name }}</h3>
+          <p class="text-sm text-gray-500">{{ meal.calories }} kcal</p>
+        </div>
+      </a>
+    {% endfor %}
+  {% endfor %}
+</div>
+{% endblock %}

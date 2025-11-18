@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white shadow rounded p-6 mt-6">
+  {% if item_type == 'meal' %}
+    <h2 class="text-2xl font-bold text-red-600 mb-4">{{ item.name }}</h2>
+    <img src="{{ item.image_url or url_for('static', filename='default_meal.jpg') }}"
+         alt="{{ item.name }}"
+         class="w-70 h-70 object-cover rounded mb-4">
+    <p class="text-gray-700 mb-2"><strong>Description:</strong> {{ item.description }}</p>
+    <p class="text-gray-700 mb-2"><strong>Ingredients:</strong> {{ item.ingredients }}</p>
+    <p class="text-gray-700 mb-2">
+      <strong>Nutrition:</strong>
+      Calories: {{ item.calories }} kcal •
+      Proteins: {{ item.protein }} g •
+      Carbs: {{ item.carbs }} g •
+      Fats: {{ item.fats }}
+    </p>
+    <p class="text-gray-700"><strong>Rest between meals:</strong> {{ item.Rest_between_meals }}</p>
+
+  {% elif item_type == 'workout' %}
+    <h2 class="text-2xl font-bold text-indigo-600 mb-4">{{ item.name }}</h2>
+  <img src="{{ item.image_url or url_for('static', filename='default_workout.jpg') }}"
+         alt="{{ item.name }}"
+         class="w-70 h-70 object-cover rounded mb-4">
+    <p class="text-gray-700"><strong>Type:</strong> {{ item.type }}</p>
+    <p class="text-gray-700"><strong>Duration:</strong> {{ item.duration }}</p>
+    <p class="text-gray-700"><strong>Intensity:</strong> {{ item.intensity }}</p>
+    <p class="text-gray-700"><strong>Sets:</strong> {{ item.sets }}</p>
+    <p class="text-gray-700"><strong>Reps:</strong> {{ item.reps }}</p>
+    <p class="text-gray-700"><strong>Rest between sets:</strong> {{ item.rest_between_sets }}</p>
+    <p class="text-gray-700"><strong>Instructions:</strong><br>{{ item.instructions }}</p>
+  {% endif %}
+
+  <div class="mt-6">
+    <a href="{{ url_for('dashboard', user_id=user_id) }}"
+   class="text-blue-600 hover:underline">← Back to Dashboard</a>
+  </div>
+</div>
+{% endblock %}
