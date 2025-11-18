@@ -44,6 +44,117 @@ class DailyPlan(BaseModel):
     meals: List[Meal]
     workouts: List[Exercise]
 
+class DailyMealsOnly(BaseModel):
+    meals: List[Meal]
+
+class DailyWorkoutsOnly(BaseModel):
+    workouts: List[Exercise]
+
+def generate_daily_meals(user):
+    """Generate only meals/snacks for one day."""
+    prompt = f"""
+    You are a certified nutrition coach.
+    Create a personalized one-day MEAL plan for a {user.age}-year-old {user.gender},
+    {user.weight} kg, {user.height} cm tall.
+    Goal: {user.fitness_goal}, Activity level: {user.activity_level},
+    Dietary preference: {user.dietary_pref}.
+
+    *Requirements*
+    - Return ONLY valid JSON.
+    - Output: 3 main meals + 2 snacks.
+    - Each entry must contain:
+      name, ingredients, description, calories, protein, carbs, fats,
+      and rest_between_meals.
+    - Respect dietary preference ({user.dietary_pref}) and fitness goal.
+    - Keep it realistic, tasty, and easy to prepare.
+
+    Example output:
+    {{
+      "meals": [
+        {{
+          "name": "Breakfast Oats Bowl",
+          "ingredients": "Oats, almond milk, banana, chia",
+          "description": "Blend oats with almond milk and top with fruits.",
+          "calories": 350,
+          "protein": 15,
+          "carbs": 50,
+          "fats": 8,
+          "Rest_between_meals": "2 h"
+        }},
+        ...
+      ]
+    }}
+    """
+
+    completion = client.chat.completions.parse(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a professional nutrition coach."},
+            {"role": "user", "content": prompt},
+        ],
+        response_format=DailyMealsOnly,
+        temperature=0.3,
+        max_completion_tokens=800,
+    )
+    plan = completion.choices[0].message.parsed
+    return plan
+
+
+def generate_daily_workouts(user):
+    """Generate only workouts for one day."""
+    # choose reps style
+    if user.activity_level.lower() in ["sedentary", "light"]:
+        reps = "2 sets per exercise"
+    elif user.activity_level.lower() == "moderate":
+        reps = "3 sets per exercise"
+    else:
+        reps = "4 sets per exercise"
+
+    prompt = f"""
+    You are a certified personal trainer.
+    Create a one‑day WORKOUT plan for a {user.age}-year-old {user.gender},
+    {user.weight} kg, {user.height} cm tall.
+    Goal: {user.fitness_goal}, Activity: {user.activity_level}.
+
+    *Requirements*
+    - Return ONLY JSON.
+    - Include exactly 3 workouts (name, type, duration, intensity, sets, reps,
+      rest_between_sets, and short instructions).
+    - Provide {reps}.
+    - Adapt difficulty to the activity level.
+
+    Example output:
+    {{
+      "workouts": [
+        {{
+          "name": "Push‑Ups",
+          "type": "Strength",
+          "duration": "10 min",
+          "intensity": "Moderate",
+          "sets": "3",
+          "reps": "12",
+          "rest_between_sets": "60 sec",
+          "instructions": "Keep core tight and full range of motion."
+        }},
+        ...
+      ]
+    }}
+    """
+
+    completion = client.chat.completions.parse(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a professional fitness coach."},
+            {"role": "user", "content": prompt},
+        ],
+        response_format=DailyWorkoutsOnly,
+        temperature=0.3,
+        max_completion_tokens=800,
+    )
+    plan = completion.choices[0].message.parsed
+    return plan
+
+
 def generate_daily_plan(user):
     # Decide reps based on activity level
     if user.activity_level.lower() in ["sedentary", "light"]:
@@ -109,7 +220,7 @@ def generate_daily_plan(user):
                  "Fats": 12,
                  "Rest between meals": "1h - 1:30h"
                }},
-                 "Snack 1": ......,
+                 "Snack 1": ".....",
                  "Name": ".....",
                  "Description": "Bread, Eggs, Milk",
                  "Ingredients": ".....",
@@ -322,8 +433,20 @@ def generate_weekly_plan(user):
             "carbs": 45,
             "fats": 12,
             "Rest time": "1h - 1:30h"
-          }}
-        ],
+          }},
+            "Snack 1": "......",
+            "Name": ".....",
+            "Description": "Bread, Eggs, Milk",
+            "Ingredients": ".....",
+            "Instructions": ".....",
+            "Calories": ,
+            "Protein": ,
+            "Carbs": ,
+            "Fats": ,
+            "Rest between meals": "2h - 3h"
+            }}
+        ]
+        
         "workouts": [
           {{
             "name": "Bench Press",
@@ -350,7 +473,7 @@ def generate_weekly_plan(user):
             {"role": "user", "content": prompt}
         ],
         response_format=WeeklyPlan,
-        max_completion_tokens=9000,
+        # max_completion_tokens=20000,
         temperature=0.2,
         # verbosity="medium"    # low, medium or high only with gpt 5
     )
