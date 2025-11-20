@@ -301,14 +301,14 @@ def get_meal_image(meal_name: str) -> str:
 
 # --- 🌐 Meal Image Fetcher with Caching ---
 @lru_cache(maxsize=200)
-def get_workout_image(workout_name: str) -> str:
+def get_workout_image(workout_name: str, user) -> str:
     try:
-        generated_image_path = generate_workout_image(workout_name)
+        generated_image_path = generate_workout_image(workout_name, user)
         return generated_image_path
 
     except Exception as e:
         print(f"[Workout image fetch error] {workout_name!r}: {e}")
-        return generate_workout_image(workout_name)
+        return generate_workout_image(workout_name, user)
 
 
 
@@ -447,7 +447,7 @@ def generate_daily_workouts(user_id):
         for workout in plan_dict.get("workouts", []):
             workout_name = workout.get("name")
             if workout_name:
-                workout["image_url"] = get_workout_image(workout_name)
+                workout["image_url"] = get_workout_image(workout_name, user)
 
         daily_plan = DailyPlan(user_id=user.id, plan_json=json.dumps(plan_dict))
         db.session.add(daily_plan)
@@ -470,11 +470,11 @@ def daily_meals(user_id):
 
 @app.route("/daily_workouts/<int:user_id>")
 def daily_workouts(user_id):
-    # user = db.session.get(User, user_id)
+    user = db.session.get(User, user_id)
     plans = DailyPlan.query.filter_by(user_id=user_id).all()
     parsed = [json.loads(p.plan_json) | {"id": p.id} for p in plans]
     return render_template("daily_workouts.html", user=user, plans=parsed)
-
+            # meal/
 @app.route("/item/<string:item_type>/<int:plan_id>/<int:item_index>")
 def item_details(item_type, plan_id, item_index):
     plan = db.session.get(DailyPlan, plan_id)
@@ -485,7 +485,7 @@ def item_details(item_type, plan_id, item_index):
     data = json.loads(plan.plan_json)
     item = None
     if item_type == "meal":
-        item = data.get("meals index", [])[item_index]
+        item = data.get("meals", [])[item_index]
         print("test (meal)"[item_index])
     elif item_type == "workout":
         item = data.get("workouts", [])[item_index]
@@ -501,4 +501,4 @@ def item_details(item_type, plan_id, item_index):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) # uvicorn to run the server
+    app.run(debug=True, port=5000) # uvicorn to run the server

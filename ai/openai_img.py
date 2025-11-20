@@ -73,22 +73,17 @@ def generate_meal_image(meal_name: str) -> str:
         return "/static/default_meal.jpg"
 
 
-def generate_workout_image(workout_name: str) -> str:
+def generate_workout_image(workout_name: str, user) -> str:
     """Generate a realistic meal image using OpenAI and save it in static folder."""
     try:
         prompt = f"""
-        Create a realistic, professional‑looking photo showing a person performing the exercise
-        '{workout_name}' with correct form.
+            Create a high-quality, realistic full‑body photo of a person performing
+            the exercise '{workout_name}' correctly in a modern gym.
+            Show the entire person from head to feet with clear technique,
+            natural lighting, sharp focus, and no text overlay, 
+            Generate the suitable and proper image based on {user.activity_level}.
+            Output only the image in a photorealistic style.
 
-        Visual style:
-        – Fitness studio or clean‑gym setting
-        – Natural lighting, motivational tone
-        – Emphasize correct body posture and movement
-        – Athletic, inclusive model (gender‑neutral unless exercise suggests otherwise)
-        – Sharp focus, high‑resolution, no text overlay, no branding
-        – Background lightly blurred to highlight the subject
-
-        Output only the image in a photorealistic style.
         """
 
         response = client.images.generate(
