@@ -78,10 +78,10 @@ def generate_workout_image(workout_name: str, user) -> str:
     try:
         prompt = f"""
             Create a high-quality, realistic full‑body photo of a person performing
-            the exercise '{workout_name}' correctly in a modern gym.
+            the exercise '{workout_name}'should be perform correctly in a modern gym.
             Show the entire person from head to feet with clear technique,
             natural lighting, sharp focus, and no text overlay, 
-            Generate the suitable and proper image based on {user.activity_level}.
+            Generate the suitable and proper image based on {user.activity_level} and {workout_name}.
             Output only the image in a photorealistic style.
 
         """

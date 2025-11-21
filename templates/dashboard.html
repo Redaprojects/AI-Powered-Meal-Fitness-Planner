@@ -32,23 +32,24 @@
   </a>
 </div>
 
-    <div class="mb-6">
-        <h3 class="font-bold">P = Proteins, C = Carbs, F = Fats</h3>
-    </div>
 
     <!-- Daily Plans Section -->
     <h2 class="text-2xl font-bold text-black mb-4">Daily Plans</h2>
     {% if user.daily_plans %}
     {% for plan in user.daily_plans %}
     <div class="bg-white shadow rounded-lg p-6 mb-6 border-l-4 border-red-600">
+
+
+    {% if plan.data.get("meals") %}
+
         <h3 class="text-xl font-semibold text-black mb-3">
-            Daily Meals Plan Generated on:
+            Daily meal plan generated on:
             {% if plan.created_at %}
             {{ plan.created_at.strftime("%Y-%m-%d") }},
             at {{ plan.created_at.strftime("%H:%M") }}
             {% else %}
-            N/A
-            <!--  {% endif %}-->
+            No generated meal plan for today
+            {% endif %}
         </h3>
 
         <h4 class="font-bold text-red-600 mt-2">Meals</h4>
@@ -71,18 +72,30 @@
           </span>
           <span>{{ meal.name }}</span>
           <span class="text-sm text-gray-700 block">
-            {{ meal.calories }} kcal | P: {{ meal.protein }} g | C: {{ meal.carbs }} g |
-            F: {{ meal.fats or meal.fat }} g
+            Calories: {{ meal.calories }} kcal | Proteins: {{ meal.protein }} g | Carbs: {{ meal.carbs }} g |
+            Fats: {{ meal.fats or meal.fat }} g
           </span>
         </div>
       </a>
     </li>
   {% endfor %}
 </ul>
+{% endif %}
 
+{% if plan.data.get("workouts") %}
+
+        <h3 class="text-xl font-semibold text-black mb-3">
+            Daily workout plan generated on:
+            {% if plan.created_at %}
+            {{ plan.created_at.strftime("%Y-%m-%d") }},
+            at {{ plan.created_at.strftime("%H:%M") }}
+            {% else %}
+            No generated workout plan for today
+            {% endif %}
+        </h3>
 
         <h4 class="font-bold text-red-600 mt-2">Workouts</h4>
-        <ul class="list-disc ml-6">
+        <ul class="list-disc ml-6 font-bold">
             {% for workout in plan.data.get("workouts", []) %}
             <li class="mb-2">
                 <a href="{{ url_for('item_details',
@@ -93,11 +106,21 @@
         <img src="{{ workout.image_url or url_for('static', filename='default_meal.jpg') }}"
              alt="{{ workout.name }}" title="{{ workout.name }}"
              class="w-20 h-20 object-cover rounded border border-gray-200 shrink-0">
-                {{ workout.name }} ({{ workout.type }}) – {{ workout.duration }},
+                    <div>
+                    <span class="text-red-600 block">
+                        {% if loop.index %} Exercise {{ (loop.index)}}:
+                        {% endif %}
+                        </span>
+                        <span>{{ workout.name }}</span>
+                    <span class="text-sm text-gray-700 block">
+                    ({{ workout.type }}) – {{ workout.duration }},
                 Intensity: {{ workout.intensity }}, Instructions: {{ workout.instructions }}
+                        </span>
+                        </div>
             </li>
             {% endfor %}
         </ul>
+        {% endif %}
     </div>
     {% endfor %}
     {% else %}

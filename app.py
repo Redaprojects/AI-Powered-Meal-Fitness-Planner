@@ -233,7 +233,7 @@ def get_meal_image(meal_name: str) -> str:
         clean = meal_name.strip().title()  # normalize casing
         response = requests.get(
             f"https://www.themealdb.com/api/json/v1/1/search.php?s={clean}",
-            timeout=5,
+            timeout=15,
         )
         data = response.json()
         meals = data.get("meals")
@@ -299,17 +299,17 @@ def get_meal_image(meal_name: str) -> str:
 #     return redirect(url_for('dashboard', user_id=user.id))
 
 
-# --- 🌐 Meal Image Fetcher with Caching ---
+# --- 🌐 Workout Image Fetcher with Caching ---
 @lru_cache(maxsize=200)
 def get_workout_image(workout_name: str, user) -> str:
+    clean_name = str(workout_name).strip().title()
     try:
-        generated_image_path = generate_workout_image(workout_name, user)
+        generated_image_path = generate_workout_image(clean_name, user)
         return generated_image_path
 
     except Exception as e:
         print(f"[Workout image fetch error] {workout_name!r}: {e}")
-        return generate_workout_image(workout_name, user)
-
+        return generate_workout_image(str(workout_name), user)
 
 
 @app.route('/generate_plan/<int:user_id>')
@@ -331,6 +331,19 @@ def generate_plan(user_id):
             meal_name = meal.get("name")
             if meal_name:
                 meal["image_url"] = get_meal_image(meal_name)
+
+        for workout in plan_dict.get("workouts", []):
+            workout_name = workout.get("name")
+
+            # list_split_method:
+            # name = workout.get("name")
+            #     if isinstance(name, list):
+            #         name = name[0]
+            #     if name:
+            #         workout["image_url"] = get_workout_image(name, user)
+            if workout_name:
+                workout["image_url"] = get_workout_image(workout_name, user)
+
 
         # Save to DB
         daily_plan = DailyPlan(
@@ -370,6 +383,12 @@ def generate_weekly_plan_route(user_id):
                 if meal_name:
                     meal["image_url"] = get_meal_image(meal_name)
 
+            # ✅ Add images for each meal in each day
+            for workout in day.get("workout", []):
+                workout_name = workout.get("name")
+                if workout_name:
+                    workout["image_url"] = get_workout_image(workout_name, user)
+
         weekly_plan = WeeklyPlan(
             user_id=user.id,
             plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
@@ -386,7 +405,7 @@ def generate_weekly_plan_route(user_id):
 
 
 # Fill missing images on the fly, but do not freeze the page; use a background thread or task queue.
-def async_get_meal_image(meal, workout):
+def async_get_all_images(meal, workout):
     if meal:
         meal_name = meal.get("name")
         meal["image_url"] = get_meal_image(meal_name)
@@ -394,11 +413,10 @@ def async_get_meal_image(meal, workout):
     else:
     
         workout_name = workout.get("name")
-        workout["image_url"] = get_workout_image(workout_name)
+        workout["image_url"] = get_workout_image(workout_name, user)
 
     # in dashboard parsing loop
-    threading.Thread(target=async_get_meal_image, args=(meal, workout)).start()
-
+    threading.Thread(target=async_get_all_images, args=(meal, workout)).start()
 
 
 # --- Generate only daily meals ---
@@ -431,6 +449,7 @@ def generate_daily_meals(user_id):
 
     return redirect(url_for('dashboard', user_id=user.id))
 
+
 # --- Generate only daily workouts ---
 @app.route("/generate_daily_workouts/<int:user_id>")
 def generate_daily_workouts(user_id):
@@ -461,6 +480,30 @@ def generate_daily_workouts(user_id):
     return redirect(url_for('dashboard', user_id=user.id))
 
 
+# Even with a longer timeout, heavy AI calls can easily take 20–40 s, making Flask feel frozen.
+# Use a lightweight background thread or a Celery task:
+###
+def background_generate_workouts(user):
+    try:
+        plan = generate_daily_workouts(user)
+        # save to DB, attach images, etc.
+    except Exception as e:
+        print(e)
+
+
+@app.route("/generate_daily_workouts/<int:user_id>")
+def async_generate_daily_workouts(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for("home"))
+
+    threading.Thread(target=background_generate_workouts, args=(user,), daemon=True).start()
+    flash("Workout generation started—refresh dashboard in a minute.", "info")
+    return redirect(url_for("dashboard", user_id=user.id))
+###
+
+
 @app.route("/daily_meals/<int:user_id>")
 def daily_meals(user_id):
     user = db.session.get(User, user_id)
@@ -468,13 +511,15 @@ def daily_meals(user_id):
     parsed = [json.loads(p.plan_json) | {"id": p.id} for p in plans]
     return render_template("daily_meals.html", user=user, plans=parsed)
 
+
 @app.route("/daily_workouts/<int:user_id>")
 def daily_workouts(user_id):
     user = db.session.get(User, user_id)
     plans = DailyPlan.query.filter_by(user_id=user_id).all()
     parsed = [json.loads(p.plan_json) | {"id": p.id} for p in plans]
     return render_template("daily_workouts.html", user=user, plans=parsed)
-            # meal/
+
+
 @app.route("/item/<string:item_type>/<int:plan_id>/<int:item_index>")
 def item_details(item_type, plan_id, item_index):
     plan = db.session.get(DailyPlan, plan_id)

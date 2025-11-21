@@ -4,8 +4,7 @@ import json, os
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-
-
+import uuid #random
 
 load_dotenv()
 
@@ -52,11 +51,16 @@ class DailyWorkoutsOnly(BaseModel):
 
 def generate_daily_meals(user):
     """Generate only meals/snacks for one day."""
+    random_key = uuid.uuid4().hex[:8]
+    # seed = random.randint(0, 99999)
+    # and reference it inside the prompt.
+    # The effect is the same: each plan request now carries a tiny random fingerprint.
+
     prompt = f"""
     You are a certified nutrition coach.
-    Create a personalized one-day MEAL plan for a {user.age}-year-old {user.gender},
-    {user.weight} kg, {user.height} cm tall.
-    Goal: {user.fitness_goal}, Activity level: {user.activity_level},
+    Create a unique personalized one-day MEAL plan for today for today (Random key: {random_key})for a client of the age: {user.age}-year-old, gender: {user.gender},
+    weight: {user.weight} kg, and height: {user.height} cm tall.
+    Based on Goal: {user.fitness_goal}, Activity level: {user.activity_level},
     Dietary preference: {user.dietary_pref}.
 
     *Requirements*
@@ -93,8 +97,9 @@ def generate_daily_meals(user):
             {"role": "user", "content": prompt},
         ],
         response_format=DailyMealsOnly,
-        temperature=0.3,
+        temperature=0.8,
         max_completion_tokens=800,
+
     )
     plan = completion.choices[0].message.parsed
     return plan
@@ -104,22 +109,28 @@ def generate_daily_workouts(user):
     """Generate only workouts for one day."""
     # choose reps style
     if user.activity_level.lower() in ["sedentary", "light"]:
-        reps = "2 sets per exercise"
+        sets = "2 sets per exercise"
+        reps = "from 8 to 10 reps per exercise"
     elif user.activity_level.lower() == "moderate":
-        reps = "3 sets per exercise"
+        sets = "3 sets per exercise"
+        reps = "from 10 to 12 reps per exercise"
     else:
-        reps = "4 sets per exercise"
+        sets = "4 sets per exercise"
+        reps = "from 10 to 15 reps per exercise"
+
+    random_key = uuid.uuid4().hex[:8]
 
     prompt = f"""
     You are a certified personal trainer.
-    Create a one‑day WORKOUT plan for a {user.age}-year-old {user.gender},
-    {user.weight} kg, {user.height} cm tall.
-    Goal: {user.fitness_goal}, Activity: {user.activity_level}.
+    Create a one‑day unique WORKOUT plan for today (Random key: {random_key}) for a client of the age: {user.age}-year-old, gender: {user.gender},
+    weight: {user.weight} kg, and height: {user.height} cm tall.
+    Based on Goal: {user.fitness_goal}, Activity: {user.activity_level}.
 
     *Requirements*
     - Return ONLY JSON.
     - Include exactly 3 workouts (name, type, duration, intensity, sets, reps,
       rest_between_sets, and short instructions).
+    - Provide {sets}
     - Provide {reps}.
     - Adapt difficulty to the activity level.
 
@@ -134,7 +145,7 @@ def generate_daily_workouts(user):
           "sets": "3",
           "reps": "12",
           "rest_between_sets": "60 sec",
-          "instructions": "Keep core tight and full range of motion."
+          "instructions": "Keep core tight and full range of motion."
         }},
         ...
       ]
@@ -148,7 +159,7 @@ def generate_daily_workouts(user):
             {"role": "user", "content": prompt},
         ],
         response_format=DailyWorkoutsOnly,
-        temperature=0.3,
+        temperature=0.8,
         max_completion_tokens=800,
     )
     plan = completion.choices[0].message.parsed
@@ -164,12 +175,14 @@ def generate_daily_plan(user):
     else:
         reps = "4 sets per exercise"
 
-    prompt = f"""
-        You are a certified fitness and nutrition coach. Create a personalized one-day plan
-        by adding duration for each workout and rest time between sets.
-        Make sure that the plan is suitable for a {user.age}-year-old {user.gender} who weighs {user.weight}kg and is {user.height}cm tall.
+    random_key = uuid.uuid4().hex[:8]
 
-        Context about the user:
+    prompt = f"""
+        You are a certified fitness and nutrition coach. Create a unique personalized one-day plan for today (Random key: {random_key})
+        by adding duration for each workout and rest time between sets.
+        Make sure that the plan is suitable for a client of the age: {user.age}-year-old, gender: {user.gender}, who weights: {user.weight}kg and height: {user.height}cm tall.
+
+        Based on this these infos about the user:
         - Fitness goal: {user.fitness_goal}
         - Activity level: {user.activity_level}
         - Dietary preference: {user.dietary_pref}
@@ -198,7 +211,7 @@ def generate_daily_plan(user):
         2. Training:
            - Sedentary/light activity → beginner-friendly workouts (walking, yoga, light bodyweight).
            - Moderate activity → balanced strength + cardio.
-           - Active/very active → higher intensity (strength, HIIT, endurance).
+           - Active/very active → higher intensity (strength, HIT, endurance).
            - Provide 3 structured workouts: name, type (strength/cardio/flexibility), duration, and intensity.
            - Provide {reps}
            - Have at least 1 or 2 days of rest. 
@@ -254,12 +267,13 @@ def generate_daily_plan(user):
     completion = client.chat.completions.parse(        # parse by using structured data.
 
     model="gpt-4o-mini",
-      messages=[
-        {"role": "developer", "content": "You are a professional coach."},
-        {"role": "user", "content": prompt}
-      ],
-      response_format=DailyPlan, # key part
-    max_completion_tokens=1000
+    messages=[
+    {"role": "developer", "content": "You are a professional coach."},
+    {"role": "user", "content": prompt}
+    ],
+    response_format=DailyPlan, # key part
+    max_completion_tokens=1000,
+    temperature=0.8
     )
 
     # plan_text = completion.choices[0].message.content
@@ -364,11 +378,14 @@ def generate_weekly_plan(user):
     today = datetime.today()
     weekday_name = today.strftime("%A")
     month_name = today.strftime("%B")
+
+    random_key = uuid.uuid4().hex[:8]
+
     prompt = f"""
     You are a certified professional fitness and nutrition coach.
-    Create a personalized 7-day weekly workout and meal plan for a {user.age}-year-old {user.gender}, 
-    {user.weight}kg, {user.height}cm tall. 
-    Goal: {user.fitness_goal}, Activity level: {user.activity_level}, Dietary preference: {user.dietary_pref}.
+    Create a personalized unique 7-day weekly workout and meal plan for a week (Random key: {random_key})
+    for a client age {user.age}-year-old, gender {user.gender}, weight {user.weight}kg, height {user.height}cm tall. 
+    Based on Goal: {user.fitness_goal}, Activity level: {user.activity_level}, Dietary preference: {user.dietary_pref}.
 
     * General Rules:
     - Always return ONLY valid JSON.
@@ -474,7 +491,7 @@ def generate_weekly_plan(user):
         ],
         response_format=WeeklyPlan,
         # max_completion_tokens=20000,
-        temperature=0.2,
+        temperature=0.8,
         # verbosity="medium"    # low, medium or high only with gpt 5
     )
 
