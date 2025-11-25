@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, flash, redirect, url_for
 from datamanager.models import db, User, DailyPlan, WeeklyPlan
 from datamanager.sqlite_data_manager import SQLiteDataManager
 from validation import validate_user_data
-from datetime import datetime,timezone ,date
+from datetime import datetime, timezone, date
 import json
 from ai.openai_service import generate_daily_plan, generate_weekly_plan, generate_daily_meals, generate_daily_workouts
 from flask_migrate import Migrate
@@ -13,7 +13,6 @@ from ai.openai_img import generate_workout_images, generate_meal_images
 # If you still want to fill missing images on the fly but not freeze the page, use a background thread or task queue.
 # For a quick Flask-only approach:
 import threading
-
 
 app = Flask(__name__)
 db_path = 'fitness_app.db'
@@ -159,12 +158,12 @@ def dashboard(user_id):
         try:
             data = plan.plan_json
             #
-            # # 🛡️ Skip parsing when empty or None
+            # Skip parsing when empty or None
             # if not data:
             #     plan.data = {"meals": [], "workouts": []}
             #     continue
             #
-            # 1️⃣ Parse JSON strings until we actually get a dict
+            # 1️Parse JSON strings until we actually get a dict
             if isinstance(raw, str):
                 data = json.loads(raw)
             else:
@@ -173,11 +172,11 @@ def dashboard(user_id):
             #     while isinstance(data, str):
             #         data = json.loads(data)
             #
-            # 2️⃣ Guarantee fallback
+            # 2️Guarantee fallback
             if not isinstance(data, dict):
                  raise ValueError("Data is not a dictionary after parsing")
             #
-            # # 3️⃣ Attach missing pictures
+            # 3️Attach missing pictures
             # for meal in data.get("meals", []):
             #     if isinstance(meal, dict):
             #         name = meal.get("name")
@@ -208,7 +207,7 @@ def dashboard(user_id):
     return render_template("dashboard.html", user=user)
 
 
-# --- 🌐 Meal Image Fetcher with Caching ---
+# Meal Image Fetcher with Caching
 @lru_cache(maxsize=200)
 def get_meal_image(meal_name: str) -> str:
     """
@@ -240,7 +239,7 @@ def get_meal_image(meal_name: str) -> str:
         if meals and meals[0].get("strMealThumb"):
             return meals[0]["strMealThumb"]
 
-        # --- fallback: retry using only the first keyword (e.g. 'Chicken' from 'Chicken Salad Bowl')
+        # fallback: retry using only the first keyword (e.g. 'Chicken' from 'Chicken Salad Bowl')
         # first_word = clean.split()[0]
         # response = requests.get(
         #     f"https://www.themealdb.com/api/json/v1/1/search.php?s={first_word}",
@@ -277,7 +276,7 @@ def get_meal_image(meal_name: str) -> str:
 #         # Call your AI service for daily plan
 #         plan_data = generate_daily_plan(user)
 #
-#         # ✅ Attach meal images
+#         # Attach meal images
 #         for meal in plan_data.get("meals", []):
 #             meal_name = meal.get("name")
 #             if meal_name:
@@ -299,7 +298,7 @@ def get_meal_image(meal_name: str) -> str:
 #     return redirect(url_for('dashboard', user_id=user.id))
 
 
-# --- 🌐 Workout Image Fetcher with Caching ---
+# Workout Image Fetcher with Caching
 @lru_cache(maxsize=200)
 def get_workout_image(workout_item, user) -> str:
     """
@@ -323,7 +322,7 @@ def get_workout_image(workout_item, user) -> str:
         return generate_workout_images({"name": str(workout_data)}, user)
 
 
-# --- Generate only daily meals ---
+# Generate only daily meals
 @app.route("/generate_daily_meals/<int:user_id>")
 def generate_daily_meals(user_id):
     user = db.session.get(User, user_id)
@@ -332,7 +331,6 @@ def generate_daily_meals(user_id):
         return redirect(url_for('home'))
     try:
         # 🔹 Call AI but only request meals
-        from ai.openai_service import generate_daily_meals
         plan_data = generate_daily_meals(user)
         plan_dict = plan_data.model_dump()
 
@@ -341,7 +339,7 @@ def generate_daily_meals(user_id):
             if meal_name:
                 meal["image_url"] = get_meal_image(meal_name)
 
-        # ✅ save to DB as a partial plan (just meals)
+        # save to DB as a partial plan (just meals)
         daily_plan = DailyPlan(user_id=user.id, plan_json=json.dumps(plan_dict))
         db.session.add(daily_plan)
         db.session.commit()
@@ -354,7 +352,7 @@ def generate_daily_meals(user_id):
     return redirect(url_for('dashboard', user_id=user.id))
 
 
-# --- Generate only daily workouts ---
+# Generate only daily workouts
 @app.route("/generate_daily_workouts/<int:user_id>")
 def generate_daily_workouts(user_id):
     user = db.session.get(User, user_id)
@@ -416,7 +414,7 @@ def generate_plan(user_id):
         plan_data = generate_daily_plan(user)  # returns DailyPlan (Pydantic model)
         plan_dict = plan_data.model_dump()            # ← convert to Python dict
 
-        # --- ✨ attach meal images here ---
+        # attach meal images here
         for meal in plan_dict.get("meals", []):
             meal_name = meal.get("name")
             if meal_name:
@@ -469,14 +467,14 @@ def generate_weekly_plan_route(user_id):
         # Call your AI service for weekly plan
         plan_data = generate_weekly_plan(user)
 
-        # ✅ Add images for each meal in each day
+        # Add images for each meal in each day
         for day in plan_data.get("days", []):
             for meal in day.get("meals", []):
                 meal_name = meal.get("name")
                 if meal_name:
                     meal["image_url"] = get_meal_image(meal_name)
 
-            # ✅ Add images for each meal in each day
+            # Add images for each meal in each day
             for workout in plan_dict.get("workouts", []):
                 # if it's a dictionary with details, read the name normally
                 if isinstance(workout, dict):
