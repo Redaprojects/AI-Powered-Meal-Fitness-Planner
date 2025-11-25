@@ -108,6 +108,7 @@ def generate_daily_meals(user):
 def generate_daily_workouts(user):
     """Generate only workouts for one day."""
     # choose reps style
+
     if user.activity_level.lower() in ["sedentary", "light"]:
         sets = "2 sets per exercise"
         reps = "from 8 to 10 reps per exercise"
@@ -122,7 +123,7 @@ def generate_daily_workouts(user):
 
     prompt = f"""
     You are a certified personal trainer.
-    Create a one‑day unique WORKOUT plan for today (Random key: {random_key}) for a client of the age: {user.age}-year-old, gender: {user.gender},
+    Create a realistic full-body photo for a person one‑day unique WORKOUT plan for today (Random key: {random_key}) for a client of the age: {user.age}-year-old, gender: {user.gender},
     weight: {user.weight} kg, and height: {user.height} cm tall.
     Based on Goal: {user.fitness_goal}, Activity: {user.activity_level}.
 

@@ -8,7 +8,7 @@ from ai.openai_service import generate_daily_plan, generate_weekly_plan, generat
 from flask_migrate import Migrate
 import requests
 from functools import lru_cache
-from ai.openai_img import generate_meal_image, generate_workout_image
+from ai.openai_img import generate_workout_images, generate_meal_images
 # Use threading (optional for dev)
 # If you still want to fill missing images on the fly but not freeze the page, use a background thread or task queue.
 # For a quick Flask-only approach:
@@ -139,7 +139,7 @@ def dashboard(user_id):
     # user = User.query.get(user_id)
     # new
     user = db.session.get(User, user_id)
-    print(user, "UUUUUUUUUUU")
+    # print(user, "UUUUUUUUUUU")
     if not user:
         flash("User not found")
         return redirect(url_for('home'))
@@ -253,13 +253,13 @@ def get_meal_image(meal_name: str) -> str:
 
         # else generate a meal pic:
         else:
-            generated_image_path = generate_meal_image(meal_name)
+            generated_image_path = generate_meal_images(meal_name)
             return generated_image_path
 
 
     except Exception as e:
         print(f"[Meal image fetch error] {meal_name!r}: {e}")
-        return generate_meal_image(meal_name)
+        return generate_meal_images(meal_name)
     # still nothing → static placeholder
 
     # return url_for("static", filename="default_meal.jpg")
@@ -301,122 +301,26 @@ def get_meal_image(meal_name: str) -> str:
 
 # --- 🌐 Workout Image Fetcher with Caching ---
 @lru_cache(maxsize=200)
-def get_workout_image(workout_name: str, user) -> str:
-    clean_name = str(workout_name).strip().title()
+def get_workout_image(workout_item, user) -> str:
+    """
+    Accepts either a workout dictionary or a plain string.
+    Always passes a proper dictionary to generate_workout_images().
+    """
+    # 🧠 1. Convert if it’s just a string
+    if isinstance(workout_item, str):
+        workout_data = {"name": workout_item}
+    else:
+        # assume it's already a dictionary
+        workout_data = workout_item
+
     try:
-        generated_image_path = generate_workout_image(clean_name, user)
+        generated_image_path = generate_workout_images(workout_data, user)
         return generated_image_path
 
     except Exception as e:
-        print(f"[Workout image fetch error] {workout_name!r}: {e}")
-        return generate_workout_image(str(workout_name), user)
-
-
-@app.route('/generate_plan/<int:user_id>')
-def generate_plan(user_id):
-    # user = User.query.get(user_id)
-    user = db.session.get(User, user_id)
-    if not user:
-        flash("User not found", "error")
-        return redirect(url_for("home"))
-
-    try:
-        db.session.commit()
-
-        plan_data = generate_daily_plan(user)  # returns DailyPlan (Pydantic model)
-        plan_dict = plan_data.model_dump()            # ← convert to Python dict
-
-        # --- ✨ attach meal images here ---
-        for meal in plan_dict.get("meals", []):
-            meal_name = meal.get("name")
-            if meal_name:
-                meal["image_url"] = get_meal_image(meal_name)
-
-        for workout in plan_dict.get("workouts", []):
-            workout_name = workout.get("name")
-
-            # list_split_method:
-            # name = workout.get("name")
-            #     if isinstance(name, list):
-            #         name = name[0]
-            #     if name:
-            #         workout["image_url"] = get_workout_image(name, user)
-            if workout_name:
-                workout["image_url"] = get_workout_image(workout_name, user)
-
-
-        # Save to DB
-        daily_plan = DailyPlan(
-            user_id=user.id,
-            plan_json=json.dumps(plan_dict, indent=2)
-        )
-        db.session.add(daily_plan)
-        db.session.commit()
-
-        flash("Daily plan generated successfully!", "success")
-
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Error generating plan: {str(e)}", "error")
-
-    return redirect(url_for('dashboard', user_id=user.id))
-
-
-@app.route('/generate_weekly_plan/<int:user_id>')
-def generate_weekly_plan_route(user_id):
-    # user = User.query.get(user_id)
-    user = db.session.get(User, user_id)
-    if not user:
-        flash("User not found", "error")
-        return redirect(url_for("home"))
-
-    try:
-        db.session.commit()  # commit any pending changes
-
-        # Call your AI service for weekly plan
-        plan_data = generate_weekly_plan(user)
-
-        # ✅ Add images for each meal in each day
-        for day in plan_data.get("days", []):
-            for meal in day.get("meals", []):
-                meal_name = meal.get("name")
-                if meal_name:
-                    meal["image_url"] = get_meal_image(meal_name)
-
-            # ✅ Add images for each meal in each day
-            for workout in day.get("workout", []):
-                workout_name = workout.get("name")
-                if workout_name:
-                    workout["image_url"] = get_workout_image(workout_name, user)
-
-        weekly_plan = WeeklyPlan(
-            user_id=user.id,
-            plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
-        )
-        db.session.add(weekly_plan)
-        db.session.commit()
-
-        flash("Weekly plan generated successfully!", "success")
-    except Exception as e:
-        db.session.rollback()
-        flash(f"Error generating weekly plan: {str(e)}", "error")
-
-    return redirect(url_for('dashboard', user_id=user.id))
-
-
-# Fill missing images on the fly, but do not freeze the page; use a background thread or task queue.
-def async_get_all_images(meal, workout):
-    if meal:
-        meal_name = meal.get("name")
-        meal["image_url"] = get_meal_image(meal_name)
-
-    else:
-    
-        workout_name = workout.get("name")
-        workout["image_url"] = get_workout_image(workout_name, user)
-
-    # in dashboard parsing loop
-    threading.Thread(target=async_get_all_images, args=(meal, workout)).start()
+        print(f"[Workout image fetch error] {workout_data.get('name', workout_data)!r}: {e}")
+        # Try one more time just using the name string
+        return generate_workout_images({"name": str(workout_data)}, user)
 
 
 # --- Generate only daily meals ---
@@ -461,12 +365,30 @@ def generate_daily_workouts(user_id):
     try:
         from ai.openai_service import generate_daily_workouts
         plan_data = generate_daily_workouts(user)
-        plan_dict = plan_data.model_dump()
+        print(type(plan_data))
+        # Ensure it's a dictionary
+        if hasattr(plan_data, "model_dump"):
+            plan_dict = plan_data.model_dump()
+            print(type(plan_dict))
+        elif isinstance(plan_data, str):
+            plan_dict = json.loads(plan_data)
+        else:
+            plan_dict = plan_data
 
         for workout in plan_dict.get("workouts", []):
-            workout_name = workout.get("name")
+            # if it's a dictionary with details, read the name normally
+            if isinstance(workout, dict):
+                workout_name = workout.get("name")
+            else:
+                # if it's just a word (string), use it directly
+                workout_name = str(workout)
+            # now try to get an image using that name
             if workout_name:
-                workout["image_url"] = get_workout_image(workout_name, user)
+                image_url = get_workout_image(workout_name, user)
+                workout["image_url"] = image_url
+                # if it's a dictionary, store the image link back inside it
+                if isinstance(workout, dict):
+                    workout["image_url"] = image_url
 
         daily_plan = DailyPlan(user_id=user.id, plan_json=json.dumps(plan_dict))
         db.session.add(daily_plan)
@@ -480,6 +402,125 @@ def generate_daily_workouts(user_id):
     return redirect(url_for('dashboard', user_id=user.id))
 
 
+@app.route('/generate_plan/<int:user_id>')
+def generate_plan(user_id):
+    # user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for("home"))
+
+    try:
+        db.session.commit()
+
+        plan_data = generate_daily_plan(user)  # returns DailyPlan (Pydantic model)
+        plan_dict = plan_data.model_dump()            # ← convert to Python dict
+
+        # --- ✨ attach meal images here ---
+        for meal in plan_dict.get("meals", []):
+            meal_name = meal.get("name")
+            if meal_name:
+                meal["image_url"] = get_meal_image(meal_name)
+
+        for workout in plan_dict.get("workouts", []):
+            # if it's a dictionary with details, read the name normally
+            if isinstance(workout, dict):
+                workout_name = workout.get("name")
+            else:
+                # if it's just a word (string), use it directly
+                workout_name = str(workout)
+            # now try to get an image using that name
+            if workout_name:
+                image_url = get_workout_image(workout_name, user)
+                workout["image_url"] = image_url
+                # if it's a dictionary, store the image link back inside it
+                if isinstance(workout, dict):
+                    workout["image_url"] = image_url
+
+
+        # Save to DB
+        daily_plan = DailyPlan(
+            user_id=user.id,
+            plan_json=json.dumps(plan_dict, indent=2)
+        )
+        db.session.add(daily_plan)
+        db.session.commit()
+
+        flash("Daily plan generated successfully!", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error generating plan: {str(e)}", "error")
+
+    return redirect(url_for('dashboard', user_id=user.id))
+
+
+@app.route('/generate_weekly_plan/<int:user_id>')
+def generate_weekly_plan_route(user_id):
+    # user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("User not found", "error")
+        return redirect(url_for("home"))
+
+    try:
+        db.session.commit()  # commit any pending changes
+
+        # Call your AI service for weekly plan
+        plan_data = generate_weekly_plan(user)
+
+        # ✅ Add images for each meal in each day
+        for day in plan_data.get("days", []):
+            for meal in day.get("meals", []):
+                meal_name = meal.get("name")
+                if meal_name:
+                    meal["image_url"] = get_meal_image(meal_name)
+
+            # ✅ Add images for each meal in each day
+            for workout in plan_dict.get("workouts", []):
+                # if it's a dictionary with details, read the name normally
+                if isinstance(workout, dict):
+                    workout_name = workout.get("name")
+                else:
+                    # if it's just a word (string), use it directly
+                    workout_name = str(workout)
+                # now try to get an image using that name
+                if workout_name:
+                    image_url = get_workout_image(workout, user)
+                    # if it's a dictionary, store the image link back inside it
+                    if isinstance(workout, dict):
+                        workout["image_url"] = image_url
+
+        weekly_plan = WeeklyPlan(
+            user_id=user.id,
+            plan_json=json.dumps(plan_data.model_dump()) # Convert Pydantic → dict → JSON string by adding .model_dump()
+        )
+        db.session.add(weekly_plan)
+        db.session.commit()
+
+        flash("Weekly plan generated successfully!", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error generating weekly plan: {str(e)}", "error")
+
+    return redirect(url_for('dashboard', user_id=user.id))
+
+
+# Fill missing images on the fly, but do not freeze the page; use a background thread or task queue.
+def async_get_all_images(meal, workout):
+    if meal:
+        meal_name = meal.get("name")
+        meal["image_url"] = get_meal_image(meal_name)
+
+    else:
+    
+        workout_name = workout.get("name")
+        workout["image_url"] = get_workout_image(workout_name, user)
+
+    # in dashboard parsing loop
+    threading.Thread(target=async_get_all_images, args=(meal, workout)).start()
+
+
 # Even with a longer timeout, heavy AI calls can easily take 20–40 s, making Flask feel frozen.
 # Use a lightweight background thread or a Celery task:
 ###
@@ -491,17 +532,17 @@ def background_generate_workouts(user):
         print(e)
 
 
-@app.route("/generate_daily_workouts/<int:user_id>")
-def async_generate_daily_workouts(user_id):
-    user = db.session.get(User, user_id)
-    if not user:
-        flash("User not found", "error")
-        return redirect(url_for("home"))
-
-    threading.Thread(target=background_generate_workouts, args=(user,), daemon=True).start()
-    flash("Workout generation started—refresh dashboard in a minute.", "info")
-    return redirect(url_for("dashboard", user_id=user.id))
-###
+# @app.route("/generate_daily_workouts/<int:user_id>")
+# def async_generate_daily_workouts(user_id):
+#     user = db.session.get(User, user_id)
+#     if not user:
+#         flash("User not found", "error")
+#         return redirect(url_for("home"))
+#
+#     threading.Thread(target=background_generate_workouts, args=(user,), daemon=True).start()
+#     flash("Workout generation started—refresh dashboard in a minute.", "info")
+#     return redirect(url_for("dashboard", user_id=user.id))
+# ###
 
 
 @app.route("/daily_meals/<int:user_id>")
@@ -546,4 +587,4 @@ def item_details(item_type, plan_id, item_index):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000) # uvicorn to run the server
+    app.run(port=5002) # uvicorn to run the server
