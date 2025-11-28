@@ -102,7 +102,7 @@ class Meal(db.Model):
     fat =  db.Column(db.Float)
     ingredients = db.Column(db.String)
     instructions = db.Column(db.String)
-    Rest_time= db.Column(db.String, nullable=False)
+    rest_time = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
