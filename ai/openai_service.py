@@ -3,11 +3,14 @@ from openai import OpenAI
 import json, os
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid #random
+# inside ai/openai_service.py
+# or:
+# impo sys
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 load_dotenv()
-
 
 client = OpenAI()
 
@@ -19,7 +22,7 @@ class Meal(BaseModel):
     protein: float
     carbs: float
     fats: float
-    Rest_between_meals: str
+    rest_between_meals: str
 
 class Meals(BaseModel):
     meals: List[Meal]
@@ -34,6 +37,8 @@ class Exercise(BaseModel):
     reps: str
     rest_between_sets: str
     instructions: str
+    workout_time: str
+    focus: str
 
 
 class Exercises(BaseModel):
@@ -58,20 +63,18 @@ def generate_daily_meals(user):
 
     prompt = f"""
     You are a certified nutrition coach.
-    Create a unique personalized one-day MEAL plan for today for today (Random key: {random_key})for a client of the age: {user.age}-year-old, gender: {user.gender},
+    Create a unique personalized one-day MEAL plan for today (Random key: {random_key}) for a client of the age: {user.age}-year-old, gender: {user.gender},
     weight: {user.weight} kg, and height: {user.height} cm tall.
     Based on Goal: {user.fitness_goal}, Activity level: {user.activity_level},
     Dietary preference: {user.dietary_pref}.
-
+    
     *Requirements*
     - Return ONLY valid JSON.
-    - Output: 3 main meals + 2 snacks.
-    - Each entry must contain:
-      name, ingredients, description, calories, protein, carbs, fats,
-      and rest_between_meals.
+    - Output: 2 main meals + 2 snacks.
+    - 1 main meal followed by a small snack.
     - Respect dietary preference ({user.dietary_pref}) and fitness goal.
     - Keep it realistic, tasty, and easy to prepare.
-
+    
     Example output:
     {{
       "meals": [
@@ -83,7 +86,7 @@ def generate_daily_meals(user):
           "protein": 15,
           "carbs": 50,
           "fats": 8,
-          "Rest_between_meals": "2 h"
+          "rest_between_meals": "2 h"
         }},
         ...
       ]
@@ -107,33 +110,77 @@ def generate_daily_meals(user):
 
 def generate_daily_workouts(user):
     """Generate only workouts for one day."""
-    # choose reps style
+    # a 7‑day outline you can reuse
+    # days = [day for day in range(1, 8)]
 
+    # choose intensity
     if user.activity_level.lower() in ["sedentary", "light"]:
         sets = "2 sets per exercise"
-        reps = "from 8 to 10 reps per exercise"
+        reps = "8 to 10 reps"
+        focuses = ["Shoulders", "Chest", "Rest", "Back", "Triceps", "Cardio", "Rest"]
+        w_time = "30 min"
+
     elif user.activity_level.lower() == "moderate":
         sets = "3 sets per exercise"
-        reps = "from 10 to 12 reps per exercise"
+        reps = "10 to 12 reps"
+        focuses = ["Legs", "Chest + Pecs", "Back + Triceps", "Rest", "Shoulders", "Cardio", "Rest"]
+        w_time = "45 min"
+
     else:
         sets = "4 sets per exercise"
-        reps = "from 10 to 15 reps per exercise"
+        reps = "10 to 15 reps"
+        focuses = ["Push (Chest + Triceps)", "Pull (Back + Biceps)",
+                         "Legs", "Rest", "Full Body HIT", "Core", "Rest"]
+        w_time = "60 min"
+
+    # now loop through the days list
+    # you could later build and return a dictionary instead of printing
+    plan = []
+    # for i in range(1, 8):
+    #     focus = workout_part[i - 1]
+    #     print(f"Day {i}: {focus} ({sets}, {reps})")
+    #     plan.append({"day": i, "focus": focus, "sets": sets, "reps": reps})
+
+    today = datetime.now()
+    days = [(today + timedelta(days=i)).strftime("%A") for i in range(7)]
+
+    for i, day_name in enumerate(days):
+        focus = focuses[i % len(focuses)]  # wrap safely if mismatch
+        if "Rest" not in focus:
+            plan.append({
+                "day": i + 1,
+                "weekday": day_name,
+                "focus": focus,
+                "sets": sets,
+                "reps": reps,
+            })
+        else:
+            plan.append({
+                "day": i + 1,
+                "weekday": day_name,
+                "focus": "Rest",
+                "sets": None,
+                "reps": None,
+            })
 
     random_key = uuid.uuid4().hex[:8]
+    today_focus = plan[0]['focus']  # e.g. Tuesday plan
 
     prompt = f"""
     You are a certified personal trainer.
-    Create a realistic full-body photo for a person one‑day unique WORKOUT plan for today (Random key: {random_key}) for a client of the age: {user.age}-year-old, gender: {user.gender},
-    weight: {user.weight} kg, and height: {user.height} cm tall.
+    Create a realistic full-body workout for a client one‑day unique plan 
+    based on {today_focus}. and workout duration for a client of the age: {user.age}-year-old, 
+    gender: {user.gender}, weight: {user.weight} kg, and height: {user.height} cm tall.
     Based on Goal: {user.fitness_goal}, Activity: {user.activity_level}.
 
     *Requirements*
-    - Return ONLY JSON.
-    - Include exactly 3 workouts (name, type, duration, intensity, sets, reps,
-      rest_between_sets, and short instructions).
-    - Provide {sets}
-    - Provide {reps}.
-    - Adapt difficulty to the activity level.
+    - for each day, should have a different {focus} and start with warm-up exercises for 5 to 10 min and 2 workout exercises.
+    • If the day's focus = "Rest", just return:
+      "Today is a rest day. Focus on recovery, hydration, and stretching."
+    • If the focus includes "Cardio", do NOT show sets or reps.
+      Provide a timing like "run fast 1 min + jog 3–4 min" with a repeat pattern.
+    • Otherwise include name, type, duration, intensity, sets, reps,
+      rest_between_sets, and short instructions.
 
     Example output:
     {{
@@ -141,8 +188,9 @@ def generate_daily_workouts(user):
         {{
           "name": "Push‑Ups",
           "type": "Strength",
+          "focus": "-----",
           "duration": "10 min",
-          "intensity": "Moderate",
+          "intensity": "Moderate",      
           "sets": "3",
           "reps": "12",
           "rest_between_sets": "60 sec",
@@ -163,8 +211,8 @@ def generate_daily_workouts(user):
         temperature=0.8,
         max_completion_tokens=800,
     )
-    plan = completion.choices[0].message.parsed
-    return plan
+    llm_result = completion.choices[0].message.parsed
+    return llm_result
 
 
 def generate_daily_plan(user):

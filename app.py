@@ -2,9 +2,10 @@ from flask import Flask, render_template, request, flash, redirect, url_for
 from datamanager.models import db, User, DailyPlan, WeeklyPlan
 from datamanager.sqlite_data_manager import SQLiteDataManager
 from validation import validate_user_data
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone ,date
+from zoneinfo import ZoneInfo
 import json
-from ai.openai_service import generate_daily_plan, generate_weekly_plan, generate_daily_meals, generate_daily_workouts
+from ai.openai_service import generate_daily_plan, generate_weekly_plan, generate_daily_workouts
 from flask_migrate import Migrate
 import requests
 from functools import lru_cache
@@ -101,6 +102,15 @@ def time_now():
         "today": date.today()
     }
 
+@app.route("/")
+def index():
+    utc_now = datetime.now(timezone.utc)
+    local_now = utc_now.astimezone(ZoneInfo("Europe/Berlin"))
+    print(utc_now)
+    print(local_now)
+
+    return render_template("index.html", time=local_now.strftime("%Y-%m-%d %H:%M:%S"))
+
 
 @app.context_processor
 def inject_date_info():
@@ -134,6 +144,8 @@ def daily_plan(user_id):
 
 @app.route('/dashboard/<int:user_id>')
 def dashboard(user_id):
+    utc_now = datetime.now(timezone.utc)
+    local_now = utc_now.astimezone(ZoneInfo("Europe/Berlin"))
     # old
     # user = User.query.get(user_id)
     # new
@@ -163,7 +175,7 @@ def dashboard(user_id):
             #     plan.data = {"meals": [], "workouts": []}
             #     continue
             #
-            # 1️Parse JSON strings until we actually get a dict
+            # 1️⃣ Parse JSON strings until we actually get a dict
             if isinstance(raw, str):
                 data = json.loads(raw)
             else:
@@ -172,11 +184,11 @@ def dashboard(user_id):
             #     while isinstance(data, str):
             #         data = json.loads(data)
             #
-            # 2️Guarantee fallback
+            # 2️⃣ Guarantee fallback
             if not isinstance(data, dict):
                  raise ValueError("Data is not a dictionary after parsing")
             #
-            # 3️Attach missing pictures
+            # 3️⃣ Attach missing pictures
             # for meal in data.get("meals", []):
             #     if isinstance(meal, dict):
             #         name = meal.get("name")
@@ -204,7 +216,7 @@ def dashboard(user_id):
                 print("Error parsing weekly plan:", e)
                 plan.data = {}
 
-    return render_template("dashboard.html", user=user)
+    return render_template("dashboard.html", user=user, time=local_now.strftime("%H:%M"))
 
 
 # Meal Image Fetcher with Caching
@@ -239,7 +251,7 @@ def get_meal_image(meal_name: str) -> str:
         if meals and meals[0].get("strMealThumb"):
             return meals[0]["strMealThumb"]
 
-        # fallback: retry using only the first keyword (e.g. 'Chicken' from 'Chicken Salad Bowl')
+        # --- fallback: retry using only the first keyword (e.g. 'Chicken' from 'Chicken Salad Bowl')
         # first_word = clean.split()[0]
         # response = requests.get(
         #     f"https://www.themealdb.com/api/json/v1/1/search.php?s={first_word}",
@@ -330,7 +342,8 @@ def generate_daily_meals(user_id):
         flash("User not found", "error")
         return redirect(url_for('home'))
     try:
-        # 🔹 Call AI but only request meals
+        # Call AI but only request meals. This won't work at the beginning
+        from ai.openai_service import generate_daily_meals
         plan_data = generate_daily_meals(user)
         plan_dict = plan_data.model_dump()
 
@@ -363,6 +376,7 @@ def generate_daily_workouts(user_id):
     try:
         from ai.openai_service import generate_daily_workouts
         plan_data = generate_daily_workouts(user)
+
         print(type(plan_data))
         # Ensure it's a dictionary
         if hasattr(plan_data, "model_dump"):
@@ -585,4 +599,4 @@ def item_details(item_type, plan_id, item_index):
 
 
 if __name__ == '__main__':
-    app.run(port=5002) # uvicorn to run the server
+    app.run(port=5000) # uvicorn to run the server

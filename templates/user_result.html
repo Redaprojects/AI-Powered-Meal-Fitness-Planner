@@ -12,22 +12,29 @@
     <li><strong>Dietary Preference:</strong> {{ user.dietary_pref }}</li>
     <li><strong>Fitness Goal:</strong> {{ user.fitness_goal }}</li>
   </ul>
+  <br>
+  <div class="flex items-center mb-6 space-x-4">
+        <form action="{{ url_for('generate_daily_meals', user_id=user.id) }}" method="get" onsubmit="showLoadingOverlay()">
+            <button type="submit"
+                    class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
+                Generate Daily Meals Plan
+            </button>
+        </form>
 
-  <a href="{{ url_for('generate_plan', user_id=user.id) }}"
-   class="bg-black text-white px-3 py-1 rounded hover:bg-gray-800">
-   Generate Plan
-</a>
+        <form action="{{ url_for('generate_daily_workouts', user_id=user.id) }}" method="get"
+              onsubmit="showLoadingOverlay()">
+            <button type="submit"
+                    class="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 font-semibold">
+                Generate Daily Workouts Plan
+            </button>
+        </form>
+    </div>
 
-  <div class="mt-6">
-    <a href="{{ url_for('generate_plan', user_id=user.id) }}" class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 font-semibold">
-      Generate Plan
-    </a>
     <a href="{{ url_for('dashboard', user_id=user.id) }}" class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 font-semibold">
       Go to Dashboard
     </a>
-    <a href="{{ url_for('add_user') }}" class="ml-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-semibold">
-      Add Another User
-    </a>
+<!--    <a href="{{ url_for('add_user') }}" class="ml-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-semibold">-->
+<!--      Add Another User-->
+<!--    </a>-->
   </div>
-</div>
 {% endblock %}

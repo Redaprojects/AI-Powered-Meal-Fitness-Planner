@@ -54,30 +54,51 @@
 
 
 
-<!-- Loading Overlay -->
-<div id="loadingOverlay"
-     class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
-  <div class="text-center text-white">
-    <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-white border-solid mx-auto mb-4"></div>
-    <p class="text-xl font-semibold">⏳ Generating your AI plan...</p>
-    <p class="text-sm text-gray-300 mt-2">Please wait.</p>
+<!--&lt;!&ndash; Loading Overlay &ndash;&gt;-->
+<!--<div id="loadingOverlay"-->
+<!--     class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">-->
+<!--  <div class="text-center text-white">-->
+<!--    <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-white border-solid mx-auto mb-4"></div>-->
+<!--    <p class="text-xl font-semibold">⏳ Generating your AI plan...</p>-->
+<!--    <p class="text-sm text-gray-300 mt-2">Please wait.</p>-->
+<!--  </div>-->
+<!--</div>-->
+
+<!--<script>-->
+<!--function showLoadingOverlay() {-->
+<!--  const overlay = document.getElementById("loadingOverlay");-->
+<!--  overlay.classList.remove("hidden");-->
+<!--  document.body.style.pointerEvents = "none";  // Disable all clicks-->
+<!--}-->
+
+<!--function hideLoadingOverlay() {-->
+<!--  const overlay = document.getElementById("loadingOverlay");-->
+<!--  overlay.classList.add("hidden");-->
+<!--  document.body.style.pointerEvents = "auto";  // Re-enable clicks-->
+<!--}-->
+<!--</script>-->
+<!-- Loading overlay -->
+  <div id="loadingOverlay"
+       class="hidden fixed inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center z-50">
+    <div class="ai-shape"></div>
+    <p class="mt-6 text-indigo-700 text-lg font-semibold animate-pulse">The AI is thinking ...</p>
   </div>
-</div>
 
-<script>
-function showLoadingOverlay() {
-  const overlay = document.getElementById("loadingOverlay");
-  overlay.classList.remove("hidden");
-  document.body.style.pointerEvents = "none";  // Disable all clicks
-}
 
-function hideLoadingOverlay() {
-  const overlay = document.getElementById("loadingOverlay");
-  overlay.classList.add("hidden");
-  document.body.style.pointerEvents = "auto";  // Re-enable clicks
-}
-</script>
+  <!-- JS -->
+  <script>
+    function showLoadingOverlay() {
+      const overlay = document.getElementById("loadingOverlay");
+      overlay.classList.remove("hidden");
+      document.body.style.pointerEvents = "none";
+    }
 
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById("loadingOverlay");
+      overlay.classList.add("hidden");
+      document.body.style.pointerEvents = "auto";
+    }
+  </script>
 
 </body>
 </html>

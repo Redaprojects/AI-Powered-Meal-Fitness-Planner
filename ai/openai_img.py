@@ -18,7 +18,7 @@ def generate_meal_images(meal_name: str) -> str:
         # with app.app_context():
         img_dir = os.path.join(current_app.static_folder, "meal_images")
         os.makedirs(img_dir, exist_ok=True)
-        timestamp = str(int(time.time()))
+        # timestamp = str(int(time.time()))
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
 
         image_filename = f"{meal_name.replace(' ', '_').lower()}_{timestamp}.png"
@@ -28,7 +28,7 @@ def generate_meal_images(meal_name: str) -> str:
         print("Image saved to:", image_path)
 
         # To avoid regenerating the same PNG every time:
-        # ✅ File already exists
+        # File already exists
         if os.path.exists(image_path):
             return f"/static/meal_images/{image_filename}"
 
@@ -51,6 +51,7 @@ def generate_meal_images(meal_name: str) -> str:
         image_data = base64.b64decode(response.data[0].b64_json)
         with open(image_path, "wb") as f:
             f.write(image_data)
+
         print(f"[Meal image] saved: {image_path}")
         return f"/static/meal_images/{image_filename}"
 
@@ -61,11 +62,13 @@ def generate_meal_images(meal_name: str) -> str:
 
 def generate_workout_images(workout_item: dict, user) -> str:
     """Generate a photorealistic workout image and save it in /static/workout_images."""
+
     try:
         # make sure workout_item is a dictionary‑like object
         if isinstance(workout_item, dict):
+
             workout_name = workout_item.get("name", "exercise")
-            timestamp = workout_item.get("created_at", str(time.time()))
+            # timestamp = workout_item.get("created_at", str(time.time()))
             timestamp = workout_item.get("created_at", str(datetime.now().strftime("%Y%m%d_%H%M")))
         else:
             # it's just a text word
@@ -97,12 +100,13 @@ def generate_workout_images(workout_item: dict, user) -> str:
             # size="512x512",
             # size = "256x256",
             n=1,
-            # response_format="b64_json"  # 👈 this makes .b64_json exist
+            # response_format="b64_json"  # this makes .b64_json exist
         )
 
         image_data = base64.b64decode(response.data[0].b64_json)
         with open(image_path, "wb") as f:
             f.write(image_data)
+
         print(f"[Workout image] saved: {image_path}")
         return f"/static/workout_images/{image_filename}"
 
@@ -129,7 +133,7 @@ if __name__ == "__main__":
 
 # Outside a Flask app (without current_app):
 # if __name__ == "__main__":
-#     from types import SimpleNamespace
+#     from types impo SimpleNamespace
 #     os.environ["OPENAI_API_KEY"] = "your-key"
 #     dummy_user = SimpleNamespace(activity_level="moderate")
 #     os.makedirs("static/meal_images", exist_ok=True)
